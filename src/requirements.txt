@@ -1,0 +1,11 @@
+requests
+python-dotenv
+pyTelegramBotAPI
+stravalib
+schedule
+#pydantic==2.6.1  # Adicionado para validação de dados
+pytest    # Para os testes
+Flask
+numpy
+pandas
+google-genai

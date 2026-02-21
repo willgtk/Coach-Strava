@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  coach_bot:
+    build: .
+    container_name: mtb_coach_bot
+    restart: unless-stopped
+    environment:
+      # Ajusta o fuso horário para o agendador bater certinho com 18h
+      - TZ=America/Sao_Paulo
+    env_file:
+      - .env
+    volumes:
+      # Cria um volume mapeando a memória local para dentro do container
+      # Se o arquivo não existir localmente, crie um vazio antes de rodar.
+      - ./memoria_coach.json:/app/memoria_coach.json
