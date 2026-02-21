@@ -29,6 +29,9 @@ Para rodar este projeto, você precisará de:
   * OpenWeather: Chave de API gratuita para dados climáticos.
 
 
+**pip install -r requirements.txt**
+
+
   🛠️ Passo a Passo para Instalação
 1. Clonar o Repositório
 

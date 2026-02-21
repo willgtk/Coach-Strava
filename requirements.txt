@@ -1,0 +1,5 @@
+requests==2.31.0
+python-dotenv==1.0.1
+pyTelegramBotAPI==4.16.1
+stravalib==1.5
+schedule==1.2.1
