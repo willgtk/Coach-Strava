@@ -86,9 +86,10 @@ def guardar_memoria(role, text):
 # ==========================================
 # CÉREBRO DA IA
 # ==========================================
+# REMOVIDO os nomes fixos da bike para tornar o prompt universal
 instrucoes_coach = """
 Você é um parceiro e treinador de Mountain Bike focado em condicionamento e qualidade de vida. 
-Seu aluno pedala uma Oggi Agile Sport (SRAM GX) e faz parte da Equipe Partiu Pedal e quer ser o melhor ciclista!
+Seu aluno faz parte da Equipe Partiu Pedal e quer ser o melhor ciclista! Você receberá os dados da bicicleta principal dele.
 Ele não treina para competições, o objetivo dele é construir uma base aeróbica forte ("ter motor") para estar sempre pronto para qualquer pedal com o grupo, sem sofrer nas subidas.
 Analise os dados do Strava, sugira treinos focados em constância e resistência, e seja um motivador amigável.
 Sempre responda de forma concisa, direta e com bom humor, ideal para leitura no Telegram.
@@ -169,9 +170,21 @@ def obter_status_bike():
         athlete = client_strava.get_athlete()
         if not athlete.bikes:
             return "Nenhuma bicicleta registada no Strava."
-        bike = athlete.bikes[0]
-        distancia_km = float(bike.distance) / 1000
-        return f"A Oggi tem {distancia_km:.1f} km acumulados no Strava."
+            
+        bike_principal = None
+        # Varre a garagem buscando a bicicleta marcada como padrão
+        for bike in athlete.bikes:
+            if bike.primary:
+                bike_principal = bike
+                break
+                
+        # Fallback: Se não achar a primária por algum motivo, pega a primeira da lista
+        if not bike_principal:
+            bike_principal = athlete.bikes[0]
+            
+        distancia_km = float(bike_principal.distance) / 1000
+        # O retorno agora fala o nome dinâmico da bicicleta configurada no Strava
+        return f"A bicicleta '{bike_principal.name}' tem {distancia_km:.1f} km acumulados no Strava."
     except Exception as e:
         return "Erro ao verificar desgaste da bicicleta."
 
@@ -197,7 +210,7 @@ def mensagem_planeamento_fim_de_semana():
     Diretrizes:
     - Sugere um treino para o fim de semana com a Equipe Partiu Pedal adequado ao clima (se chover, avisa sobre a lama).
     - Avalia se o volume da semana foi bom para manter o "motor".
-    - Se a quilometragem da bicicleta for alta, deixa um alerta amigável sobre lubrificar a corrente SRAM GX ou verificar o desgaste.
+    - Se a quilometragem da bicicleta for alta, deixa um alerta amigável sobre lubrificar a relação ou verificar o desgaste.
     Sê um verdadeiro parceiro de treino!
     """
     
@@ -225,7 +238,8 @@ def send_welcome(message):
     chat_id = str(message.chat.id)
     set_key(env_path, 'TELEGRAM_CHAT_ID', chat_id)
     os.environ['TELEGRAM_CHAT_ID'] = chat_id
-    bot.reply_to(message, "Coach Inteligente ativado! 🚵‍♂️\nJá registei o teu contato. Agora monitorizo o teu Strava, o desgaste da tua Oggi e o clima de Curitiba! SIMBOOOORA!")
+    # Alterado para ficar genérico em relação à bicicleta
+    bot.reply_to(message, "Coach Inteligente ativado! 🚵‍♂️\nJá registei o teu contato. Agora monitorizo o teu Strava, o desgaste da tua bicicleta e o clima de Curitiba! SIMBOOOORA!")
 
 @bot.message_handler(commands=['semana'])
 def analisar_semana(message):
