@@ -2,6 +2,14 @@
 
 O **Coach-Strava** é um bot de Telegram proativo projetado para atuar como seu treinador de Mountain Bike e parceiro de trilha. Ele cruza dados reais das suas pedaladas, analisa a previsão do tempo e usa a inteligência do Google Gemini para te manter motivado, consistente e com a manutenção da sua bicicleta em dia.
 
+---
+
+> 💡 **Primeira vez mexendo com código ou terminal?**
+> Se você não é da área de tecnologia, nunca usou o GitHub ou não tem o costume de usar linhas de comando, nós preparamos um passo a passo focado em você! 
+> 👉 **[Clique aqui para ler o Guia Zero a Um: Preparando seu Computador](GUIA_INICIANTES.md)**. Leia este guia rápido antes de seguir com a instalação abaixo para deixar seu VS Code e Git prontos para o uso.
+
+---
+
 ## ✨ Funcionalidades
 
 * **📊 Análise de Dados (Strava):** Monitora seu volume de treinos (km, elevação, dias pedalados) e identifica automaticamente a sua **bicicleta principal** cadastrada no Strava para alertar sobre o desgaste acumulado.
