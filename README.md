@@ -1,6 +1,6 @@
 # 🚵‍♂️ MTB AI Coach: Seu Treinador de Performance com Inteligência Artificial
 
-O **Coach-Strava** é um bot de Telegram proativo projetado para atuar como seu treinador de Mountain Bike e parceiro de trilha. Ele cruza dados reais das suas pedaladas, analisa a previsão do tempo e usa a inteligência do Google Gemini para te manter motivado, consistente e com a manutenção da sua bicicleta em dia.
+O **Coach-Strava** é um bot de Telegram proativo projetado para atuar como seu treinador de Mountain Bike e parceiro de trilha. Ele cruza dados reais das suas pedaladas, analisa a previsão do tempo e usa a inteligência do Google Gemini para te manter motivado, consistente e com a manutenção da sua bicicleta em dia. Todas essa informações em seu Telegram! Converse com o bot e avence seu nivel no pedal!
 
 ---
 
