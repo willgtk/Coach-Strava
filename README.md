@@ -35,7 +35,7 @@ Para rodar este projeto, você precisará de:
   🛠️ Passo a Passo para Instalação
 1. Clonar o Repositório
 
-git clone https://github.com/SEU_USUARIO/Coach-Strava.git
+git clone https://github.com/willgtk/Coach-Strava.git
 
 cd Coach-Strava
 
