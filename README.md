@@ -69,9 +69,7 @@ TELEGRAM_CHAT_ID=seu_id_telegram
 
 Rode o script de autenticação para garantir que o bot tenha permissão de ler suas atividades e seu perfil (garagem):
 
-python auth.strava.py
-
-python auth_strava_definitivo.py
+python setup_strava_auth.py
 
 
 5. Executar o Bot
