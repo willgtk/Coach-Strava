@@ -42,7 +42,7 @@ cd Coach-Strava
 
 
 2. Instalar Dependências
-pip install requests python-dotenv telebot stravalib schedule
+pip install -r requirements.txt
 
 3. Configurar as Variáveis de Ambiente
 
