@@ -29,7 +29,7 @@ Antes de instalar, você precisará criar contas e gerar chaves (gratuitas) nas 
 ### Passo 1: Clonar o Repositório
 Abra o seu terminal e clone o projeto para a sua máquina:
 ```bash
-git clone [https://github.com/SEU_USUARIO/Coach-Strava.git](https://github.com/SEU_USUARIO/Coach-Strava.git)
+git clone https://github.com/willgtk/Coach-Strava.git
 cd Coach-Strav
 ```
 
