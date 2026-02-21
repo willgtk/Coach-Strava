@@ -1,92 +1,134 @@
-🚵‍♂️ MTB AI Coach: Seu Treinador de Performance com Inteligência Artificial
-Este projeto consiste em um Bot de Telegram proativo projetado para ciclistas de Mountain Bike que buscam constância e evolução (o famoso "ganhar motor"). O script integra dados reais do Strava, previsões meteorológicas e o poder de processamento do Google Gemini para atuar como um professor particular e parceiro de trilha.
+# 🚵‍♂️ MTB AI Coach: Seu Treinador de Performance com Inteligência Artificial
 
-🚀 Como o Script Funciona?
-O bot opera em três frentes principais:
+O **Coach-Strava** é um bot de Telegram proativo projetado para atuar como seu treinador de Mountain Bike e parceiro de trilha. Ele cruza dados reais das suas pedaladas, analisa a previsão do tempo e usa a inteligência do Google Gemini para te manter motivado, consistente e com a manutenção da sua bicicleta em dia.
 
-1 - Análise de Dados (Strava API): O script monitora suas atividades semanais, calculando volume de quilometragem, ganho de elevação e tempo de movimento. Ele também rastreia o desgaste do seu equipamento (como a quilometragem da sua Oggi).
+## ✨ Funcionalidades
 
-2 - Inteligência Geográfica e Climática: Utilizando a API do OpenWeather, o bot verifica as condições para Curitiba e região, ajustando as sugestões de treino de acordo com a previsão de chuva ou sol.
+* **📊 Análise de Dados (Strava):** Monitora seu volume de treinos (km, elevação, dias pedalados) e identifica automaticamente a sua **bicicleta principal** cadastrada no Strava para alertar sobre o desgaste acumulado.
+* **🌤️ Inteligência Climática (OpenWeather):** Verifica a previsão do tempo local para te avisar se o pedal de fim de semana terá sol, chuva ou muita lama.
+* **🧠 Cérebro de IA com Memória (Google Gemini):** Utiliza o modelo *Gemini 2.5 Flash* com memória persistente. O bot lembra das suas conversas anteriores, dores relatadas e manutenções feitas na bike.
+* **⏰ Proatividade (Agendador):** Toda sexta-feira às 18:00, o bot te envia proativamente um planejamento para o fim de semana com base no seu cansaço e no clima.
+* **🐳 Pronto para Produção (Docker):** Totalmente conteinerizado, garantindo que rode perfeitamente em qualquer sistema operacional sem conflito de bibliotecas.
 
-3 - Cérebro de IA (Google Gemini): Através de um "System Prompt" calibrado, a IA processa os dados brutos e gera feedbacks motivadores, sugestões técnicas para o uso do grupo SRAM GX e metas para os próximos pedais com a Equipe Partiu Pedal.
+---
 
-4 - Memória Persistente: O bot possui um banco de dados em JSON que armazena o histórico de conversas, permitindo que ele aprenda sobre suas dores, trocas de componentes e evolução ao longo do tempo.
+## 📋 Pré-requisitos
 
+Antes de instalar, você precisará criar contas e gerar chaves (gratuitas) nas seguintes plataformas:
 
-📋 Requisitos e Dependências
-Para rodar este projeto, você precisará de:
+1.  **Telegram:** Fale com o [@BotFather](https://t.me/botfather) para criar um bot e obter o `TELEGRAM_TOKEN`.
+2.  **Google AI Studio:** Crie uma API Key gratuita para o Gemini em [Google AI Studio](https://aistudio.google.com/).
+3.  **Strava Developers:** Acesse [Strava API](https://developers.strava.com/), crie uma aplicação e anote seu `Client ID` e `Client Secret`.
+4.  **OpenWeather:** Crie uma conta no [OpenWeatherMap](https://openweathermap.org/api) e gere sua API Key.
+5.  **Docker e Docker Compose:** Essenciais para rodar a aplicação de forma isolada e limpa.
 
-* Python 3.10 ou superior.
+---
 
-* Tokens de API:
+## 🚀 Guia de Instalação Passo a Passo
 
-  * Telegram: Obtido via @BotFather.
+### Passo 1: Clonar o Repositório
+Abra o seu terminal e clone o projeto para a sua máquina:
+```bash
+git clone [https://github.com/SEU_USUARIO/Coach-Strava.git](https://github.com/SEU_USUARIO/Coach-Strava.git)
+cd Coach-Strav
+```
 
-  * Google Gemini: Chave de API gerada no Google AI Studio.
-
-  * Strava: Client ID e Client Secret obtidos no Strava Developers.
-
-  * OpenWeather: Chave de API gratuita para dados climáticos.
-
-
-**pip install -r requirements.txt**
-
-
-  🛠️ Passo a Passo para Instalação
-1. Clonar o Repositório
-
-git clone https://github.com/willgtk/Coach-Strava.git
-
-cd Coach-Strava
+Passo 2: Configurar as Variáveis de Ambiente
+Na raiz do projeto, crie um arquivo chamado .env (você pode se basear no arquivo .env.example, se houver) e preencha com as suas chaves:
 
 
+```bash
+STRAVA_CLIENT_ID=seu_client_id_aqui
+STRAVA_CLIENT_SECRET=seu_client_secret_aqui
+GOOGLE_API_KEY=sua_chave_do_gemini
+TELEGRAM_TOKEN=seu_token_do_telegram
+OPENWEATHER_API_KEY=sua_chave_do_clima
 
-2. Instalar Dependências
-pip install -r requirements.txt
+# As variáveis abaixo serão preenchidas automaticamente nos próximos passos:
+STRAVA_TOKEN=
+STRAVA_REFRESH_TOKEN=
+TELEGRAM_CHAT_ID=
+```
 
-3. Configurar as Variáveis de Ambiente
+Passo 3: Autenticação do Strava (Obrigatório)
+O bot precisa de permissão para ler seus treinos e equipamentos. Para gerar os tokens de acesso:
 
-Crie um arquivo .env na raiz do projeto com a seguinte estrutura:
+1. Tenha o Python instalado na sua máquina para rodar este script de configuração.
 
-STRAVA_CLIENT_ID=seu_id
+2. Instale a biblioteca do Strava e o dotenv:
 
-STRAVA_CLIENT_SECRET=seu_secret
+```bash
+pip install stravalib python-dotenv
+```
 
-STRAVA_TOKEN=token_inicial
+3. Rode o script de autorização:
 
-STRAVA_REFRESH_TOKEN=refresh_token_inicial
-
-GOOGLE_API_KEY=sua_chave_gemini
-
-TELEGRAM_TOKEN=seu_token_bot
-
-OPENWEATHER_API_KEY=sua_chave_clima
-
-TELEGRAM_CHAT_ID=seu_id_telegram
-
-
-4. Autorização do Strava
-
-Rode o script de autenticação para garantir que o bot tenha permissão de ler suas atividades e seu perfil (garagem):
-
+```bash
 python setup_strava_auth.py
+```
+
+4. O terminal vai gerar um link. Clique nele, faça login no seu Strava e clique em Autorizar.
+
+5. Você será redirecionado para uma página com erro (http://localhost...). Isso é normal! Copie a URL inteira dessa página de erro e cole de volta no seu terminal.
+
+6. Pronto! O script salvará os tokens de acesso direto no seu arquivo .env.
 
 
-5. Executar o Bot
+Passo 4: Criar o arquivo de memória
+Crie um arquivo de texto vazio chamado memoria_coach.json na raiz do projeto. Ele será usado pelo Docker para salvar as conversas:
 
-python bot_coach.py
+# No Linux/Mac:
+```bash
+touch memoria_coach.json
+```
 
-🤖 Comandos Disponíveis no Telegram
+# No Windows (PowerShell):
+```bash
+if (!(Test-Path memoria_coach.json)) { Set-Content memoria_coach.json "[]" }
+```
 
-* /start: Inicializa o bot e registra seu Chat ID para mensagens proativas.
+Passo 5: Subir o Bot com Docker
+Com as chaves configuradas, deixe a infraestrutura fazer o trabalho pesado. No terminal, rode:
+```bash
+docker compose up -d --build
+```
 
-* /semana: Solicita um resumo manual e imediato do desempenho dos últimos 7 dias, incluindo clima e status da bike.
+O Docker vai baixar as dependências, compilar o que for necessário e subir o bot. Para acompanhar se deu tudo certo, veja os logs com docker compose logs -f.
 
-* Conversa Livre: Você pode enviar mensagens como "Troquei os pneus por tubeless hoje" e o bot salvará isso na memória de longo prazo para feedbacks futuros.
+---
 
-📅 Rotina Proativa
+🤖 Como Usar
+Vá até o Telegram, busque pelo seu bot e envie os comandos:
 
-O script possui um agendador (schedule) configurado para te chamar todas as sextas-feiras às 18:00. Ele analisará sua semana e sugerirá o melhor plano para o pedal de fim de semana com base no seu cansaço e na previsão do tempo.
+/start: Inicia o bot. Importante: Isso registra o seu Chat ID no sistema, permitindo que o bot te envie mensagens proativas na sexta-feira.
 
+/semana: Força o bot a ler o seu Strava, o clima e o desgaste da sua bicicleta naquele exato momento, gerando um resumo detalhado e uma dica de treino.
 
+Mensagem Livre: Converse naturalmente. Ex: "Hoje o pedal teve muita lama, precisei trocar as pastilhas de freio". O bot vai guardar isso na memória para as próximas conversas.
 
+---
+
+🛠️ Personalização (Para Devs)
+Se você quiser adaptar o bot para a sua realidade, abra o arquivo bot_coach.py e altere:
+
+Sua Cidade: Na função obter_previsao_tempo(), altere q=Curitiba,BR para a sua cidade.
+
+Sua Equipe: Na variável instrucoes_coach (o "System Prompt"), mude o nome da "Equipe Partiu Pedal" para o seu grupo de ciclismo para respostas mais imersivas.
+
+Horário do Alerta: Na linha do schedule.every().friday.at("18:00"), mude para o dia e hora que preferir.
+
+---
+
+🤝 Contribuições
+Sinta-se à vontade para abrir Issues relatando bugs ou Pull Requests com melhorias no código! Toda ajuda para otimizar o projeto é bem-vinda.
+
+```bash
+***
+
+### O que eu destaco nessa nova versão:
+1. **Foco na Fluidez:** O "Passo 3" (Autenticação do Strava) explica exatamente o comportamento do redirecionamento do `localhost`, evitando que o usuário comum ache que algo quebrou.
+2. **Aviso do `/start`:** Deixei explícito que o usuário *precisa* dar `/start` no bot primeiro. Como o ID do chat é salvo na hora, se ele não der `/start`, a função de mensagem proativa da sexta-feira falha por não saber para quem mandar.
+3. **Sessão de Personalização:** Como o seu código tem raízes na sua rotina (Curitiba, Equipe Partiu Pedal), deixei uma seção específica ensinando o usuário comum a ir no código e alterar para a cidade e equipe dele.
+
+Pode copiar, colar no seu repositório e comitar. A apresentação do projeto agora está no nível da engenharia que aplicamos nele!
+```
