@@ -3,3 +3,5 @@ python-dotenv==1.0.1
 pyTelegramBotAPI==4.16.1
 stravalib==1.5
 schedule==1.2.1
+pydantic==2.6.1  # Adicionado para validação de dados
+pytest==8.0.0    # Para os testes

@@ -23,6 +23,12 @@ GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 OPENWEATHER_API_KEY = os.getenv('OPENWEATHER_API_KEY')
 
+# 1.1 Validar variaveis.
+required_vars = ['STRAVA_CLIENT_ID', 'GOOGLE_API_KEY', 'TELEGRAM_TOKEN', 'OPENWEATHER_API_KEY']
+for var in required_vars:
+    if not os.getenv(var):
+        raise ValueError(f"Variável de ambiente faltando: {var}")
+
 # 2. Inicializar as APIs
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 client_ai = genai.Client(api_key=GOOGLE_API_KEY)
