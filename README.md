@@ -41,7 +41,7 @@ git clone https://github.com/willgtk/Coach-Strava.git
 cd Coach-Strav
 ```
 
-Passo 2: Configurar as Variáveis de Ambiente
+### Passo 2: Configurar as Variáveis de Ambiente
 Na raiz do projeto, crie um arquivo chamado .env (você pode se basear no arquivo .env.example, se houver) e preencha com as suas chaves:
 
 
@@ -58,7 +58,7 @@ STRAVA_REFRESH_TOKEN=
 TELEGRAM_CHAT_ID=
 ```
 
-Passo 3: Autenticação do Strava (Obrigatório)
+### Passo 3: Autenticação do Strava (Obrigatório)
 O bot precisa de permissão para ler seus treinos e equipamentos. Para gerar os tokens de acesso:
 
 1. Tenha o Python instalado na sua máquina para rodar este script de configuração.
@@ -82,7 +82,7 @@ python setup_strava_auth.py
 6. Pronto! O script salvará os tokens de acesso direto no seu arquivo .env.
 
 
-Passo 4: Criar o arquivo de memória
+### Passo 4: Criar o arquivo de memória
 Crie um arquivo de texto vazio chamado memoria_coach.json na raiz do projeto. Ele será usado pelo Docker para salvar as conversas:
 
 # No Linux/Mac:
@@ -95,7 +95,7 @@ touch memoria_coach.json
 if (!(Test-Path memoria_coach.json)) { Set-Content memoria_coach.json "[]" }
 ```
 
-Passo 5: Subir o Bot com Docker
+### Passo 5: Subir o Bot com Docker
 Com as chaves configuradas, deixe a infraestrutura fazer o trabalho pesado. No terminal, rode:
 ```bash
 docker compose up -d --build
@@ -105,7 +105,7 @@ O Docker vai baixar as dependências, compilar o que for necessário e subir o b
 
 ---
 
-🤖 Como Usar
+### 🤖 Como Usar
 Vá até o Telegram, busque pelo seu bot e envie os comandos:
 
 /start: Inicia o bot. Importante: Isso registra o seu Chat ID no sistema, permitindo que o bot te envie mensagens proativas na sexta-feira.
@@ -116,7 +116,7 @@ Mensagem Livre: Converse naturalmente. Ex: "Hoje o pedal teve muita lama, precis
 
 ---
 
-🛠️ Personalização (Para Devs)
+### 🛠️ Personalização (Para Devs)
 Se você quiser adaptar o bot para a sua realidade, abra o arquivo bot_coach.py e altere:
 
 Sua Cidade: Na função obter_previsao_tempo(), altere q=Curitiba,BR para a sua cidade.
@@ -127,7 +127,7 @@ Horário do Alerta: Na linha do schedule.every().friday.at("18:00"), mude para o
 
 ---
 
-🤝 Contribuições
+### 🤝 Contribuições
 Sinta-se à vontade para abrir Issues relatando bugs ou Pull Requests com melhorias no código! Toda ajuda para otimizar o projeto é bem-vinda.
 
 ```bash
