@@ -1,0 +1,91 @@
+import os
+from datetime import datetime, timedelta
+from dotenv import load_dotenv
+import telebot
+from google import genai
+from google.genai import types
+from stravalib.client import Client
+
+# 1. Carrega as variáveis de ambiente
+load_dotenv()
+STRAVA_TOKEN = os.getenv('STRAVA_TOKEN')
+GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
+TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
+
+# 2. Inicializa as APIs
+bot = telebot.TeleBot(TELEGRAM_TOKEN)
+client_ai = genai.Client(api_key=GOOGLE_API_KEY)
+client_strava = Client(access_token=STRAVA_TOKEN)
+
+# 3. Configura o Cérebro do Coach (System Prompt)
+instrucoes_coach = """
+Você é um treinador de Mountain Bike de alta performance. Seu aluno usa uma Oggi Agile Sport com SRAM GX.
+Você deve agir como um coach: analise dados, sugira treinos, puxe a orelha quando necessário e seja motivador. Seja um bom professor, mas tambem exigente!
+Sempre responda de forma concisa e direta, ideal para leitura rápida no Telegram. Seja sarcástico quando o desempenho for ruim, mas sempre com a intenção de motivar a melhorar.
+"""
+
+# Cria a sessão de chat (Isso dá 'memória' à conversa enquanto o script rodar)
+chat_session = client_ai.chats.create(
+    model='gemini-2.5-flash',
+    config=types.GenerateContentConfig(
+        system_instruction=instrucoes_coach,
+    )
+)
+
+# 4. Função para puxar o resumo da semana no Strava
+def obter_resumo_semana():
+    uma_semana_atras = datetime.now() - timedelta(days=7)
+    atividades = client_strava.get_activities(after=uma_semana_atras)
+    
+    total_km = 0
+    total_elevacao = 0
+    qtd_pedais = 0
+    
+    for act in atividades:
+        if act.type in ["Ride", "VirtualRide", "MountainBikeRide"]:
+            total_km += float(act.distance) / 1000
+            total_elevacao += float(act.total_elevation_gain)
+            qtd_pedais += 1
+            
+    if qtd_pedais == 0:
+        return "Nenhum pedal registrado nos últimos 7 dias."
+        
+    return f"Resumo dos últimos 7 dias: {qtd_pedais} pedais, {total_km:.1f} km rodados, {total_elevacao:.0f}m de elevação acumulada."
+
+# 5. Comandos do Telegram
+
+@bot.message_handler(commands=['start', 'help'])
+def send_welcome(message):
+    texto = "Fala, ciclista! Sou seu Coach de MTB com AI. 🚵‍♂️\n\n"
+    texto += "Comandos disponíveis:\n"
+    texto += "/semana - Analisa seu desempenho nos últimos 7 dias.\n"
+    texto += "Ou simplesmente me mande uma mensagem pedindo dicas de treino!"
+    bot.reply_to(message, texto)
+
+@bot.message_handler(commands=['semana'])
+def analisar_semana(message):
+    bot.reply_to(message, "Buscando seus dados no Strava... ⏳")
+    try:
+        dados = obter_resumo_semana()
+        
+        # Envia os dados para a IA analisar
+        prompt = f"Analise meu volume de treino desta semana e me sugira o próximo treino: {dados}"
+        resposta_ia = chat_session.send_message(prompt)
+        
+        bot.reply_to(message, resposta_ia.text)
+    except Exception as e:
+        bot.reply_to(message, f"Deu ruim ao buscar no Strava. Seu token expirou? Erro: {e}")
+
+# Captura qualquer outra mensagem (Conversa livre com memória)
+@bot.message_handler(func=lambda message: True)
+def conversa_livre(message):
+    # Mostra que o bot está "digitando"
+    bot.send_chat_action(message.chat.id, 'typing')
+    
+    # Envia o que você digitou para a IA
+    resposta_ia = chat_session.send_message(message.text)
+    bot.reply_to(message, resposta_ia.text)
+
+# 6. Mantém o bot rodando
+print("🤖 Coach de MTB online no Telegram! Pressione Ctrl+C para parar.")
+bot.infinity_polling()
