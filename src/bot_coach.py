@@ -86,7 +86,6 @@ def guardar_memoria(role, text):
 # ==========================================
 # CÉREBRO DA IA
 # ==========================================
-# REMOVIDO os nomes fixos da bike para tornar o prompt universal
 instrucoes_coach = """
 Você é um parceiro e treinador de Mountain Bike focado em condicionamento e qualidade de vida. 
 Seu aluno faz parte da Equipe Partiu Pedal e quer ser o melhor ciclista! Você receberá os dados da bicicleta principal dele.
@@ -172,18 +171,15 @@ def obter_status_bike():
             return "Nenhuma bicicleta registada no Strava."
             
         bike_principal = None
-        # Varre a garagem buscando a bicicleta marcada como padrão
         for bike in athlete.bikes:
             if bike.primary:
                 bike_principal = bike
                 break
                 
-        # Fallback: Se não achar a primária por algum motivo, pega a primeira da lista
         if not bike_principal:
             bike_principal = athlete.bikes[0]
             
         distancia_km = float(bike_principal.distance) / 1000
-        # O retorno agora fala o nome dinâmico da bicicleta configurada no Strava
         return f"A bicicleta '{bike_principal.name}' tem {distancia_km:.1f} km acumulados no Strava."
     except Exception as e:
         return "Erro ao verificar desgaste da bicicleta."
@@ -238,7 +234,6 @@ def send_welcome(message):
     chat_id = str(message.chat.id)
     set_key(env_path, 'TELEGRAM_CHAT_ID', chat_id)
     os.environ['TELEGRAM_CHAT_ID'] = chat_id
-    # Alterado para ficar genérico em relação à bicicleta
     bot.reply_to(message, "Coach Inteligente ativado! 🚵‍♂️\nJá registei o teu contato. Agora monitorizo o teu Strava, o desgaste da tua bicicleta e o clima de Curitiba! SIMBOOOORA!")
 
 @bot.message_handler(commands=['semana'])
@@ -252,15 +247,37 @@ def analisar_semana(message):
     
     bot.reply_to(message, resposta_ia.text)
 
-@bot.message_handler(func=lambda message: True)
-def conversa_livre(message):
-    bot.send_chat_action(message.chat.id, 'typing')
+@bot.message_handler(commands=['clima'])
+def comando_clima(message):
+    bot.reply_to(message, "A olhar para o céu de Curitiba... ☁️⏳")
+    clima_atual = obter_previsao_tempo()
+    prompt = f"O atleta pediu a previsão do tempo. Responda de forma parceira e motivadora usando estes dados de Curitiba: {clima_atual}"
     
-    guardar_memoria("user", message.text)
-    resposta_ia = chat_session.send_message(message.text)
+    guardar_memoria("user", "/clima")
+    resposta_ia = chat_session.send_message(prompt)
     guardar_memoria("model", resposta_ia.text)
     
     bot.reply_to(message, resposta_ia.text)
 
-print("🤖 Coach 3.0 (Memória Persistente + Clima + Mecânica) a correr no Telegram!")
+@bot.message_handler(func=lambda message: True)
+def conversa_livre(message):
+    bot.send_chat_action(message.chat.id, 'typing')
+    texto_usuario = message.text.lower()
+    
+    # 🕵️‍♂️ INTERCEPTADOR: Se o usuário falar de clima na conversa livre, injetamos os dados
+    palavras_clima = ['clima', 'tempo', 'temperatura', 'chover', 'chuva', 'sol', 'frio', 'calor']
+    if any(palavra in texto_usuario for palavra in palavras_clima):
+        clima_atual = obter_previsao_tempo()
+        # Colocamos o dado como uma tag de sistema para a IA ler, mas sem o usuário ver
+        prompt_final = f"{message.text}\n\n[DADOS DE SISTEMA PARA SUA RESPOSTA: {clima_atual}]"
+    else:
+        prompt_final = message.text
+        
+    guardar_memoria("user", message.text)
+    resposta_ia = chat_session.send_message(prompt_final)
+    guardar_memoria("model", resposta_ia.text)
+    
+    bot.reply_to(message, resposta_ia.text)
+
+print("🤖 Coach 3.0 (Memória Persistente + Clima Interativo + Mecânica) a correr no Telegram!")
 bot.infinity_polling()
