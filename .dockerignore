@@ -1,0 +1,10 @@
+.env
+.env.example
+.git
+.gitignore
+__pycache__
+.pytest_cache
+src/tests/
+src/__pycache__
+memoria_coach.json
+*.md

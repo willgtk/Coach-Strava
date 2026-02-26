@@ -1,0 +1,17 @@
+# Variáveis de ambiente (chaves de API)
+.env
+
+# Memória persistente do bot
+memoria_coach.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/

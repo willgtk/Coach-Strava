@@ -2,6 +2,7 @@ import json
 import os
 import tempfile
 import pytest
+from unittest.mock import patch, MagicMock
 
 
 # ==========================================
@@ -24,23 +25,25 @@ class TestMemoria:
         if os.path.exists(self.filepath):
             os.remove(self.filepath)
 
-    def test_guardar_e_carregar_memoria(self):
+    @patch('ai_engine.FICHEIRO_MEMORIA')
+    def test_guardar_e_carregar_memoria(self, mock_path):
         """Verifica que guardar e carregar memória funciona."""
-        # Simula guardar memória diretamente no JSON
-        dados = [
-            {"role": "user", "text": "Olá"},
-            {"role": "model", "text": "Olá, campeão!"}
-        ]
-        with open(self.filepath, 'w', encoding='utf-8') as f:
-            json.dump(dados, f, ensure_ascii=False)
+        mock_path.__str__ = lambda s: self.filepath
+        # Patch para que o módulo use nosso ficheiro temporário
+        with patch('ai_engine.FICHEIRO_MEMORIA', self.filepath):
+            from ai_engine import guardar_memoria
 
-        # Lê e verifica
-        with open(self.filepath, 'r', encoding='utf-8') as f:
-            resultado = json.load(f)
+            guardar_memoria("user", "Olá")
+            guardar_memoria("model", "Olá, campeão!")
 
-        assert len(resultado) == 2
-        assert resultado[0]['role'] == 'user'
-        assert resultado[1]['role'] == 'model'
+            with open(self.filepath, 'r', encoding='utf-8') as f:
+                resultado = json.load(f)
+
+            assert len(resultado) == 2
+            assert resultado[0]['role'] == 'user'
+            assert resultado[0]['text'] == 'Olá'
+            assert resultado[1]['role'] == 'model'
+            assert resultado[1]['text'] == 'Olá, campeão!'
 
     def test_memoria_vazia(self):
         """Verifica que ficheiro vazio retorna lista vazia."""
@@ -57,34 +60,38 @@ class TestMemoria:
             with open(self.filepath, 'r', encoding='utf-8') as f:
                 json.load(f)
 
-    def test_limite_40_mensagens(self):
-        """Verifica que o historico é limitado a 40 mensagens."""
-        dados = []
-        for i in range(50):
-            role = "user" if i % 2 == 0 else "model"
-            dados.append({"role": role, "text": f"Mensagem {i}"})
+    @patch('ai_engine.FICHEIRO_MEMORIA')
+    def test_limite_40_mensagens(self, mock_path):
+        """Verifica que o histórico é limitado a 40 mensagens."""
+        with patch('ai_engine.FICHEIRO_MEMORIA', self.filepath):
+            from ai_engine import guardar_memoria
 
-        # Simula o comportamento de guardar_memoria
-        if len(dados) > 40:
-            dados = dados[-40:]
+            for i in range(50):
+                role = "user" if i % 2 == 0 else "model"
+                guardar_memoria(role, f"Mensagem {i}")
 
-        assert len(dados) == 40
-        assert dados[0]['text'] == 'Mensagem 10'
+            with open(self.filepath, 'r', encoding='utf-8') as f:
+                dados = json.load(f)
+
+            assert len(dados) == 40
+            # As 10 primeiras devem ter sido descartadas
+            assert dados[0]['text'] == 'Mensagem 10'
 
     def test_validacao_roles_alternados(self):
-        """Verifica que mensagem órfã de user é removida."""
+        """Verifica que mensagem órfã de user é removida ao carregar."""
         dados = [
             {"role": "user", "text": "Pergunta 1"},
             {"role": "model", "text": "Resposta 1"},
             {"role": "user", "text": "Pergunta sem resposta"}
         ]
+        with open(self.filepath, 'w', encoding='utf-8') as f:
+            json.dump(dados, f, ensure_ascii=False)
 
-        # Simula validação do carregar_memoria
-        if len(dados) > 0 and dados[-1]['role'] == 'user':
-            dados.pop()
+        with patch('ai_engine.FICHEIRO_MEMORIA', self.filepath):
+            from ai_engine import carregar_memoria
+            resultado = carregar_memoria()
 
-        assert len(dados) == 2
-        assert dados[-1]['role'] == 'model'
+        assert len(resultado) == 2
 
 
 # ==========================================
@@ -95,9 +102,9 @@ class TestInterceptadores:
 
     def test_detecta_palavras_clima(self):
         palavras_clima = ['clima', 'tempo', 'temperatura', 'chover', 'chuva', 'sol', 'frio', 'calor']
-        assert any(p in "Como está o tempo hoje?" for p in palavras_clima)
-        assert any(p in "Vai chover amanhã?" for p in palavras_clima)
-        assert not any(p in "Me manda uma rota" for p in palavras_clima)
+        assert any(p in "como está o tempo hoje?" for p in palavras_clima)
+        assert any(p in "vai chover amanhã?" for p in palavras_clima)
+        assert not any(p in "me manda uma rota" for p in palavras_clima)
 
     def test_detecta_palavras_strava(self):
         palavras_strava = [
@@ -122,6 +129,17 @@ class TestInterceptadores:
         assert any(p in "como está a kaéti?" for p in palavras_bike)
         assert not any(p in "bom dia!" for p in palavras_bike)
 
+    def test_nao_detecta_falso_positivo(self):
+        """Verifica que mensagens genéricas não ativam interceptadores."""
+        palavras_clima = ['clima', 'tempo', 'temperatura', 'chover', 'chuva', 'sol', 'frio', 'calor']
+        palavras_strava = ['pedal', 'treino', 'km', 'strava']
+        palavras_bike = ['bike', 'bicicleta', 'corrente', 'freio']
+
+        msg = "bom dia, tudo bem?"
+        assert not any(p in msg for p in palavras_clima)
+        assert not any(p in msg for p in palavras_strava)
+        assert not any(p in msg for p in palavras_bike)
+
 
 # ==========================================
 # TESTES DE CONFIGURAÇÃO
@@ -141,3 +159,53 @@ class TestConfig:
         partes = cidade.split(',')
         assert len(partes) == 2
         assert len(partes[1]) == 2  # Código do país tem 2 caracteres
+
+    def test_team_name_padrao(self):
+        """Verifica que o nome da equipe padrão está definido."""
+        team = os.getenv('TEAM_NAME', 'Equipe Partiu Pedal')
+        assert len(team) > 0
+
+
+# ==========================================
+# TESTES DE UTILIDADES DO BOT
+# ==========================================
+_MAX_MSG_LEN = 4096
+
+
+def _enviar_resposta_segura(bot, chat_id, texto, reply_to=None):
+    """Cópia local da função para teste sem importar bot_coach (evita iniciar o bot)."""
+    for i in range(0, len(texto), _MAX_MSG_LEN):
+        pedaco = texto[i:i + _MAX_MSG_LEN]
+        if reply_to and i == 0:
+            bot.reply_to(reply_to, pedaco)
+        else:
+            bot.send_message(chat_id, pedaco)
+
+
+class TestEnviarRespostaSegura:
+    """Testa a lógica de envio seguro de mensagens longas."""
+
+    def test_mensagem_curta_envia_direto(self):
+        """Mensagem curta deve ser enviada numa única chamada."""
+        mock_bot = MagicMock()
+        mock_reply = MagicMock()
+
+        _enviar_resposta_segura(mock_bot, "123", "Olá!", reply_to=mock_reply)
+
+        mock_bot.reply_to.assert_called_once_with(mock_reply, "Olá!")
+        mock_bot.send_message.assert_not_called()
+
+    def test_mensagem_longa_divide(self):
+        """Mensagem maior que 4096 chars deve ser dividida em pedaços."""
+        mock_bot = MagicMock()
+
+        texto_grande = "A" * 5000
+        _enviar_resposta_segura(mock_bot, "123", texto_grande)
+
+        # Sem reply_to, tudo vai por send_message
+        assert mock_bot.send_message.call_count == 2
+        # Primeiro pedaço = 4096 chars, segundo = 904 chars
+        args1 = mock_bot.send_message.call_args_list[0]
+        args2 = mock_bot.send_message.call_args_list[1]
+        assert len(args1[0][1]) == 4096
+        assert len(args2[0][1]) == 904

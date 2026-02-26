@@ -42,8 +42,13 @@ cd Coach-Strava
 ```
 
 ### Passo 2: Configurar as Variáveis de Ambiente
-Na raiz do projeto, crie um arquivo chamado .env (você pode se basear no arquivo .env.example, se houver) e preencha com as suas chaves:
+Na raiz do projeto, copie o arquivo de exemplo e preencha com as suas chaves:
 
+```bash
+cp .env.example .env
+```
+
+Edite o `.env` e preencha:
 
 ```bash
 STRAVA_CLIENT_ID=seu_client_id_aqui
@@ -72,7 +77,7 @@ pip install stravalib python-dotenv
 3. Rode o script de autorização:
 
 ```bash
-python setup_strava_auth.py
+python src/setup_strava_auth.py
 ```
 
 4. O terminal vai gerar um link. Clique nele, faça login no seu Strava e clique em Autorizar.
@@ -117,13 +122,15 @@ Mensagem Livre: Converse naturalmente. Ex: "Hoje o pedal teve muita lama, precis
 ---
 
 ### 🛠️ Personalização (Para Devs)
-Se você quiser adaptar o bot para a sua realidade, abra o arquivo bot_coach.py e altere:
+Se você quiser adaptar o bot para a sua realidade, edite as variáveis no `.env`:
 
-Sua Cidade: Na função obter_previsao_tempo(), altere q=Curitiba,BR para a sua cidade.
+Sua Cidade: Altere `CITY=Curitiba,BR` para a sua cidade no formato `Cidade,PAIS`.
 
-Sua Equipe: Na variável instrucoes_coach (o "System Prompt"), mude o nome da "Equipe Partiu Pedal" para o seu grupo de ciclismo para respostas mais imersivas.
+Sua Equipe: Altere `TEAM_NAME=Equipe Partiu Pedal` para o nome do seu grupo de ciclismo.
 
-Horário do Alerta: Na linha do schedule.every().friday.at("18:00"), mude para o dia e hora que preferir.
+Horário do Alerta: No arquivo `bot_coach.py`, na linha do `schedule.every().friday.at("18:00")`, mude para o dia e hora que preferir.
+
+> ⏰ **Nota sobre fuso horário:** O agendador usa o fuso do sistema. No Docker, o fuso é configurado pela variável `TZ=America/Sao_Paulo` no `docker-compose.yml`. Ao rodar localmente, o horário segue o fuso do seu sistema operacional.
 
 ---
 

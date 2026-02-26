@@ -3,8 +3,8 @@ from dotenv import load_dotenv, set_key
 from stravalib.client import Client
 from urllib.parse import urlparse, parse_qs
 
-# Ensure .env file exists
-env_path = os.path.join(os.path.dirname(__file__), '.env')
+# .env fica na raiz do projeto (pai de src/)
+env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
 if not os.path.exists(env_path):
     open(env_path, 'w').close()
 
