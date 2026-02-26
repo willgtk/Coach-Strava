@@ -6,10 +6,11 @@ from dotenv import set_key
 
 import telebot
 
-from config import TELEGRAM_TOKEN, TEAM_NAME, env_path, logger
+from config import TELEGRAM_TOKEN, TEAM_NAME, META_MENSAL_KM, env_path, logger
 from strava_service import (
     obter_resumo_semana, obter_ultimo_pedal,
-    obter_status_bike, obter_status_bike_texto
+    obter_status_bike, obter_status_bike_texto,
+    obter_progresso_mensal, gerar_grafico_progresso
 )
 from weather_service import obter_previsao_tempo
 from ai_engine import chat_session, guardar_memoria
@@ -48,17 +49,23 @@ def mensagem_planeamento_fim_de_semana():
         dados_treino = obter_resumo_semana()
         clima = obter_previsao_tempo()
         bike = obter_status_bike_texto()
+        
+        # Gamificação: Progresso na meta mensal
+        meta = obter_progresso_mensal(META_MENSAL_KM)
+        texto_meta = meta if isinstance(meta, str) else meta.get('texto', 'Erro ao obter meta.')
 
         prompt = f"""
         Inicia a conversa de forma proativa. Hoje é sexta-feira. 
-        Cruza estes 3 dados para criar a tua mensagem:
+        Cruza estes 4 dados para criar a tua mensagem:
         1. Resumo da Semana: {dados_treino}
         2. Clima (Próx 24h): {clima}
         3. Status da Bicicleta: {bike}
+        4. Meta do Mês: {texto_meta}
         
         Diretrizes:
         - Sugere um treino para o fim de semana com a {TEAM_NAME} adequado ao clima (se chover, avisa sobre a lama).
         - Avalia se o volume da semana foi bom para manter o "motor".
+        - Celebre ou cobre (de forma amigável) o progresso em relação à meta do mês. Se faltar pouco, o motive muito! Se estiver longe, diga que o fim de semana é para tirar o atraso.
         - Se a quilometragem da bicicleta for alta, deixa um alerta amigável sobre lubrificar a relação ou verificar o desgaste.
         Sê um verdadeiro parceiro de treino!
         """
@@ -101,7 +108,8 @@ def send_welcome(message):
         "Já registrei o teu contato. Agora monitorizo o teu Strava, "
         "o desgaste da tua bicicleta e o clima! SIMBOOOORA!\n\n"
         "📋 *Comandos disponíveis:*\n"
-        "/semana — Resumo semanal completo\n"
+        "/semana — Resumo semanal completo e andamento da meta\n"
+        "/grafico —  Gráfico de evolução e treino\n"
         "/pedal — Dados do último pedal\n"
         "/bike — Status da bicicleta\n"
         "/clima — Previsão do tempo\n"
@@ -110,16 +118,46 @@ def send_welcome(message):
     )
 
 
+@bot.message_handler(commands=['grafico'])
+def enviar_grafico(message):
+    """Comando /grafico: envia a imagem gerada com o volume de treino."""
+    try:
+        msg_wait = bot.reply_to(message, "A desenhar o teu gráfico de evolução dos últimos 30 dias... 📊⏳")
+        caminho_grafico = gerar_grafico_progresso(30)
+        
+        if caminho_grafico and os.path.exists(caminho_grafico):
+            with open(caminho_grafico, 'rb') as foto:
+                bot.send_photo(message.chat.id, foto, caption="A tua evolução nos últimos 30 dias! 🚀")
+            os.remove(caminho_grafico)  # Limpa o arquivo após o envio
+            bot.delete_message(message.chat.id, msg_wait.message_id) # remove as reticencias
+        else:
+            bot.edit_message_text(
+                "Não consegui gerar o teu gráfico neste momento. Tu tens pedalado nos últimos dias?",
+                chat_id=message.chat.id,
+                message_id=msg_wait.message_id
+            )
+            
+    except Exception as e:
+        logger.error(f"Erro no /grafico: {e}")
+        bot.reply_to(message, "⚠️ Erro ao gerar o gráfico. Tente novamente em instantes.")
+
+
 @bot.message_handler(commands=['semana'])
 def analisar_semana(message):
-    """Comando /semana: análise semanal com treino + clima + bike."""
+    """Comando /semana: análise semanal com treino + clima + bike + meta."""
     try:
-        bot.reply_to(message, "A procurar dados de treino, clima e equipamento... ⏳")
+        bot.reply_to(message, "A procurar dados de treino, metas do mês, clima e equipamento... ⏳")
+        
+        meta = obter_progresso_mensal(META_MENSAL_KM)
+        texto_meta = meta if isinstance(meta, str) else meta.get('texto', 'Erro ao obter meta.')
+        
         prompt = (
             f"O atleta pediu um resumo manual agora. "
-            f"Treino: {obter_resumo_semana()}. "
+            f"Treino Semana: {obter_resumo_semana()}. "
+            f"Meta Mês: {texto_meta}. "
             f"Clima: {obter_previsao_tempo()}. "
             f"Bike: {obter_status_bike_texto()}."
+            f"\n\nInstruções: Faça um resumo engajador juntando todas as informações, motivando o atleta a bater a meta mensal."
         )
 
         guardar_memoria("user", prompt)

@@ -114,7 +114,8 @@ O Docker vai baixar as dependências, compilar o que for necessário e subir o b
 Vá até o Telegram, busque pelo seu bot e envie os comandos:
 
 - `/start` ou `/help`: Inicia o bot, exibe os comandos e registra o seu Chat ID no sistema, permitindo que o bot te envie mensagens proativas na sexta-feira.
-- `/semana`: Força o bot a ler o seu Strava, o clima e o desgaste da sua bicicleta naquele exato momento, gerando um resumo detalhado e uma dica de treino.
+- `/semana`: Força o bot a ler o seu Strava, o clima, o desgaste da sua bicicleta e o andamento da sua meta mensal naquele exato momento, gerando um resumo detalhado e uma dica de treino.
+- `/grafico`: Gera e envia uma imagem com o gráfico do seu saldo de quilometragem por dia nos últimos 30 dias. Excelente para ver a constância visualmente!
 - `/pedal`: Busca e analisa os dados detalhados do seu último pedal no Strava, indicando pontos fortes e o que melhorar.
 - `/bike`: Verifica a sua bicicleta principal no Strava, mostra a quilometragem atual e dá dicas de manutenção precisas (freios, corrente, relação).
 - `/clima`: Obtém a previsão do tempo detalhada e envia uma mensagem motivadora já adaptada às condições climáticas para o seu próximo pedal.

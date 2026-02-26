@@ -32,6 +32,13 @@ CITY = os.getenv('CITY', 'Curitiba,BR')
 # Nome da equipe configurável
 TEAM_NAME = os.getenv('TEAM_NAME', 'Equipe Partiu Pedal')
 
+# Meta de km mensal configurável (padrão: 150km)
+try:
+    META_MENSAL_KM = float(os.getenv('META_MENSAL_KM', '150'))
+except ValueError:
+    logger.warning("Valor inválido para META_MENSAL_KM. Usando o padrão de 150km.")
+    META_MENSAL_KM = 150.0
+
 # Caminho do arquivo de memória (na raiz do projeto)
 FICHEIRO_MEMORIA = os.path.join(_project_root, 'memoria_coach.json')
 
