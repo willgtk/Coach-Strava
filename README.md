@@ -38,7 +38,7 @@ Antes de instalar, você precisará criar contas e gerar chaves (gratuitas) nas 
 Abra o seu terminal e clone o projeto para a sua máquina:
 ```bash
 git clone https://github.com/willgtk/Coach-Strava.git
-cd Coach-Strav
+cd Coach-Strava
 ```
 
 ### Passo 2: Configurar as Variáveis de Ambiente
