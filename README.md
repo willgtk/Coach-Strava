@@ -130,13 +130,7 @@ Horário do Alerta: Na linha do schedule.every().friday.at("18:00"), mude para o
 ### 🤝 Contribuições
 Sinta-se à vontade para abrir Issues relatando bugs ou Pull Requests com melhorias no código! Toda ajuda para otimizar o projeto é bem-vinda.
 
-```bash
-***
 
-### O que eu destaco nessa nova versão:
-1. **Foco na Fluidez:** O "Passo 3" (Autenticação do Strava) explica exatamente o comportamento do redirecionamento do `localhost`, evitando que o usuário comum ache que algo quebrou.
-2. **Aviso do `/start`:** Deixei explícito que o usuário *precisa* dar `/start` no bot primeiro. Como o ID do chat é salvo na hora, se ele não der `/start`, a função de mensagem proativa da sexta-feira falha por não saber para quem mandar.
-3. **Sessão de Personalização:** Como o seu código tem raízes na sua rotina (Curitiba, Equipe Partiu Pedal), deixei uma seção específica ensinando o usuário comum a ir no código e alterar para a cidade e equipe dele.
+## 📜 Licença
 
-Pode copiar, colar no seu repositório e comitar. A apresentação do projeto agora está no nível da engenharia que aplicamos nele!
-```
+Este projeto é open-source. Contribuições são bem-vindas!
