@@ -2,7 +2,7 @@
 .env
 
 # Memória persistente do bot
-memoria_coach.json
+coach_database.db
 
 # Python
 __pycache__/

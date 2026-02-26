@@ -87,18 +87,9 @@ python src/setup_strava_auth.py
 6. Pronto! O script salvará os tokens de acesso direto no seu arquivo .env.
 
 
-### Passo 4: Criar o arquivo de memória
-Crie um arquivo de texto vazio chamado memoria_coach.json na raiz do projeto. Ele será usado pelo Docker para salvar as conversas:
-
-# No Linux/Mac:
-```bash
-touch memoria_coach.json
-```
-
-# No Windows (PowerShell):
-```bash
-if (!(Test-Path memoria_coach.json)) { Set-Content memoria_coach.json "[]" }
-```
+### Passo 4: O Banco de Dados de Memória
+O bot utiliza um banco de dados SQLite para se lembrar de você e dos seus amigos separadamente!
+Você não precisa se preocupar em criá-lo: assim que o bot iniciar pela primeira vez, ele criará automaticamente um arquivo seguro chamado `coach_database.db` na raiz do seu projeto. É lá que o "cérebro" dele ficará guardado.
 
 ### Passo 5: Subir o Bot com Docker
 Com as chaves configuradas, deixe a infraestrutura fazer o trabalho pesado. No terminal, rode:
@@ -120,7 +111,9 @@ Vá até o Telegram, busque pelo seu bot e envie os comandos:
 - `/bike`: Verifica a sua bicicleta principal no Strava, mostra a quilometragem atual e dá dicas de manutenção precisas (freios, corrente, relação).
 - `/clima`: Obtém a previsão do tempo detalhada e envia uma mensagem motivadora já adaptada às condições climáticas para o seu próximo pedal.
 
-**Mensagem Livre**: Converse naturalmente. Ex: "Hoje o pedal teve muita lama, precisei trocar as pastilhas de freio". O bot vai guardar isso na memória para as próximas conversas e até interceptar o clima e dados do Strava automaticamente dependendo das palavras!
+**🎙️ Walkie-Talkie (Mensagem de Voz)**: Está no meio da trilha e não quer digitar? Basta gravar um áudio natural (ex: *"Coach, acabei de virar um single track insano, me dá uma dica de recuperação"*). O bot usa o motor multimodal da IA para escutar a sua voz, entender o contexto, e te responder!
+
+**Mensagem Livre**: Converse naturalmente por texto. Ex: "Hoje o pedal teve muita lama, precisei trocar as pastilhas de freio". O bot vai guardar isso na memória para as próximas conversas e até interceptar o clima e dados do Strava automaticamente dependendo das palavras!
 
 ---
 

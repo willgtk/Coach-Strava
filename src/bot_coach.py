@@ -13,7 +13,7 @@ from strava_service import (
     obter_progresso_mensal, gerar_grafico_progresso
 )
 from weather_service import obter_previsao_tempo
-from ai_engine import chat_session, guardar_memoria
+from ai_engine import get_chat_session, guardar_memoria, processar_mensagem_audio
 
 # ==========================================
 # INICIALIZAR O BOT DO TELEGRAM
@@ -70,9 +70,11 @@ def mensagem_planeamento_fim_de_semana():
         Sê um verdadeiro parceiro de treino!
         """
 
-        guardar_memoria("user", prompt)
-        resposta_ia = chat_session.send_message(prompt)
-        guardar_memoria("model", resposta_ia.text)
+        session = get_chat_session(chat_id)
+        
+        guardar_memoria(chat_id, "user", prompt)
+        resposta_ia = session.send_message(prompt)
+        guardar_memoria(chat_id, "model", resposta_ia.text)
 
         enviar_resposta_segura(bot, chat_id, resposta_ia.text)
         logger.info("Mensagem proativa enviada com sucesso.")
@@ -160,9 +162,12 @@ def analisar_semana(message):
             f"\n\nInstruções: Faça um resumo engajador juntando todas as informações, motivando o atleta a bater a meta mensal."
         )
 
-        guardar_memoria("user", prompt)
-        resposta_ia = chat_session.send_message(prompt)
-        guardar_memoria("model", resposta_ia.text)
+        chat_id = message.chat.id
+        session = get_chat_session(chat_id)
+        
+        guardar_memoria(chat_id, "user", prompt)
+        resposta_ia = session.send_message(prompt)
+        guardar_memoria(chat_id, "model", resposta_ia.text)
 
         enviar_resposta_segura(bot, message.chat.id, resposta_ia.text, reply_to=message)
     except Exception as e:
@@ -183,9 +188,12 @@ def ultimo_pedal(message):
             f"para construir o 'motor' aeróbico."
         )
 
-        guardar_memoria("user", "/pedal")
-        resposta_ia = chat_session.send_message(prompt)
-        guardar_memoria("model", resposta_ia.text)
+        chat_id = message.chat.id
+        session = get_chat_session(chat_id)
+        
+        guardar_memoria(chat_id, "user", "/pedal")
+        resposta_ia = session.send_message(prompt)
+        guardar_memoria(chat_id, "model", resposta_ia.text)
 
         enviar_resposta_segura(bot, message.chat.id, resposta_ia.text, reply_to=message)
     except Exception as e:
@@ -216,9 +224,12 @@ def status_bike(message):
             f"Seja amigável e prático."
         )
 
-        guardar_memoria("user", "/bike")
-        resposta_ia = chat_session.send_message(prompt)
-        guardar_memoria("model", resposta_ia.text)
+        chat_id = message.chat.id
+        session = get_chat_session(chat_id)
+        
+        guardar_memoria(chat_id, "user", "/bike")
+        resposta_ia = session.send_message(prompt)
+        guardar_memoria(chat_id, "model", resposta_ia.text)
 
         enviar_resposta_segura(bot, message.chat.id, resposta_ia.text, reply_to=message)
     except Exception as e:
@@ -237,14 +248,51 @@ def comando_clima(message):
             f"Responda de forma parceira e motivadora usando estes dados: {clima_atual}"
         )
 
-        guardar_memoria("user", "/clima")
-        resposta_ia = chat_session.send_message(prompt)
-        guardar_memoria("model", resposta_ia.text)
+        chat_id = message.chat.id
+        session = get_chat_session(chat_id)
+        
+        guardar_memoria(chat_id, "user", "/clima")
+        resposta_ia = session.send_message(prompt)
+        guardar_memoria(chat_id, "model", resposta_ia.text)
 
         enviar_resposta_segura(bot, message.chat.id, resposta_ia.text, reply_to=message)
     except Exception as e:
         logger.error(f"Erro no /clima: {e}")
         bot.reply_to(message, "⚠️ Erro ao processar. Tente novamente em instantes.")
+
+
+@bot.message_handler(content_types=['voice'])
+def receber_audio(message):
+    """Handler para receber e processar mensagens de áudio (Walkie-Talkie)."""
+    try:
+        msg_wait = bot.reply_to(message, "A ouvir o teu áudio... 🎧⏳")
+        bot.send_chat_action(message.chat.id, 'record_voice')
+        
+        # Obter informações do arquivo de áudio no Telegram
+        file_info = bot.get_file(message.voice.file_id)
+        
+        # Fazer o download
+        downloaded_file = bot.download_file(file_info.file_path)
+        
+        # Salvar num arquivo temporário (.ogg)
+        caminho_temporario = f"temp_audio_{message.chat.id}_{message.message_id}.ogg"
+        with open(caminho_temporario, 'wb') as new_file:
+            new_file.write(downloaded_file)
+            
+        prompt = "O atleta enviou esta mensagem de áudio (Walkie-Talkie) possivelmente durante ou após o seu pedal. Escute, faça um breve resumo do que ele falou e responda como seu Coach parceiro de treino."
+        
+        resposta = processar_mensagem_audio(message.chat.id, caminho_temporario, prompt_adicional=prompt)
+        
+        # Limpar o arquivo temporário
+        if os.path.exists(caminho_temporario):
+            os.remove(caminho_temporario)
+            
+        bot.delete_message(message.chat.id, msg_wait.message_id)
+        enviar_resposta_segura(bot, message.chat.id, resposta, reply_to=message)
+        
+    except Exception as e:
+        logger.error(f"Erro no processamento de áudio: {e}")
+        bot.reply_to(message, "⚠️ Erro ao processar o seu áudio. Os meus ouvidos digitais falharam, pode gravar de novo ou enviar por texto?")
 
 
 @bot.message_handler(func=lambda message: True)
@@ -291,9 +339,12 @@ def conversa_livre(message):
         if dados_extras:
             prompt_final = message.text + "\n\n" + "\n".join(dados_extras)
 
-        guardar_memoria("user", message.text)
-        resposta_ia = chat_session.send_message(prompt_final)
-        guardar_memoria("model", resposta_ia.text)
+        chat_id = message.chat.id
+        session = get_chat_session(chat_id)
+        
+        guardar_memoria(chat_id, "user", message.text)
+        resposta_ia = session.send_message(prompt_final)
+        guardar_memoria(chat_id, "model", resposta_ia.text)
 
         enviar_resposta_segura(bot, message.chat.id, resposta_ia.text, reply_to=message)
     except Exception as e:

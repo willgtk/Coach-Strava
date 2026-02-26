@@ -11,4 +11,4 @@ services:
     volumes:
       # Cria um volume mapeando a memória local para dentro do container
       # Se o arquivo não existir localmente, crie um vazio antes de rodar.
-      - ./memoria_coach.json:/app/memoria_coach.json
+      - ./coach_database.db:/app/coach_database.db

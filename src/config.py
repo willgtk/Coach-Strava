@@ -39,8 +39,8 @@ except ValueError:
     logger.warning("Valor inválido para META_MENSAL_KM. Usando o padrão de 150km.")
     META_MENSAL_KM = 150.0
 
-# Caminho do arquivo de memória (na raiz do projeto)
-FICHEIRO_MEMORIA = os.path.join(_project_root, 'memoria_coach.json')
+# Caminho do banco de dados SQLite (na raiz do projeto)
+DB_PATH = os.path.join(_project_root, 'coach_database.db')
 
 # Validação de variáveis obrigatórias
 required_vars = ['STRAVA_CLIENT_ID', 'GOOGLE_API_KEY', 'TELEGRAM_TOKEN', 'OPENWEATHER_API_KEY']
