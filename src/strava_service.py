@@ -96,7 +96,9 @@ def obter_ultimo_pedal():
     if not pedais:
         return "Nenhum pedal encontrado nos últimos 30 dias."
 
-    ultimo = pedais[0]  # A API retorna em ordem cronológica decrescente
+    # A API não garante a ordem quando usamos 'after', então ordenamos explicitamente
+    pedais.sort(key=lambda x: x.start_date_local, reverse=True)
+    ultimo = pedais[0]
     distancia_km = float(ultimo.distance) / 1000
     elevacao = float(ultimo.total_elevation_gain)
     # stravalib retorna Duration, não timedelta — usar int() para obter segundos
