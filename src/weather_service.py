@@ -1,10 +1,16 @@
 """
 Serviço de previsão do tempo via OpenWeather API.
 """
+from __future__ import annotations
+
 import requests
+from cachetools import TTLCache
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from config import OPENWEATHER_API_KEY, CITY, logger
+
+# Cache de previsão do tempo com TTL de 10 minutos
+_weather_cache: TTLCache = TTLCache(maxsize=5, ttl=600)
 
 
 # ==========================================
@@ -18,6 +24,11 @@ from config import OPENWEATHER_API_KEY, CITY, logger
 )
 def obter_previsao_tempo() -> str:
     """Retorna previsão do tempo das próximas 24h para a cidade configurada."""
+    cache_key = f"weather_{CITY}"
+    if cache_key in _weather_cache:
+        logger.debug("Cache hit para previsão do tempo.")
+        return _weather_cache[cache_key]
+
     if not OPENWEATHER_API_KEY:
         return "Clima: API Key não configurada."
     try:
@@ -35,6 +46,8 @@ def obter_previsao_tempo() -> str:
         resumo = ""
         for p in previsoes[::2]:  # Pula de 6 em 6 horas
             resumo += f" {p['dt_txt'][11:16]}h: {p['main']['temp']:.0f}°C, {p['weather'][0]['description']} |"
+
+        _weather_cache[cache_key] = resumo
         return resumo
     except requests.exceptions.Timeout:
         logger.error("Timeout ao buscar previsão do tempo.")

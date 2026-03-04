@@ -19,9 +19,10 @@ O **Coach-Strava** é um bot de Telegram proativo projetado para atuar como seu 
 * **📷 Análise Visual de Fotos (Gemini Multimodal):** Envie fotos da trilha, bicicleta, equipamento ou paisagem e o coach analisa visualmente e responde com dicas!
 * **🏆 Conquistas Automáticas:** O bot celebra marcos como bater a meta mensal, atingir 50%/75% da meta, ou marcos de quilometragem na bike (1000km, 3000km, 5000km).
 * **🎯 Meta Personalizada:** Cada usuário pode definir sua própria meta mensal de quilometragem diretamente pelo chat.
-* **📈 Histórico de Evolução:** Comparativo mês a mês para acompanhar sua evolução ao longo do tempo.
-* **🔄 Resiliência:** Cache inteligente de dados Strava, retry automático com backoff exponencial em APIs externas, e renovação automática de tokens.
-* **🐳 Pronto para Produção (Docker):** Totalmente conteinerizado com health check, garantindo monitoramento e auto-restart.
+*   **📈 Histórico de Evolução:** Comparativo mês a mês para acompanhar sua evolução ao longo do tempo.
+*   **🥇 Ranking (Leaderboard):** Veja o ranking de km rodados entre todos os membros da sua equipe registrados no bot.
+*   **🔄 Resiliência:** Cache inteligente de dados Strava e OpenWeather, retry automático com backoff exponencial em APIs externas, e renovação automática de tokens.
+*   **🐳 Pronto para Produção (Docker):** Totalmente conteinerizado com health check e graceful shutdown, garantindo monitoramento e encerramento seguro.
 
 ---
 
@@ -113,7 +114,8 @@ O Docker vai baixar as dependências, compilar o que for necessário e subir o b
 ## 🤖 Como Usar
 Vá até o Telegram, busque pelo seu bot e envie os comandos:
 
-- `/start` ou `/help`: Inicia o bot, exibe os comandos e registra o seu Chat ID no sistema, permitindo que o bot te envie mensagens proativas na sexta-feira.
+- `/start`: Inicia o bot, exibe os comandos e registra o seu Chat ID no sistema, permitindo que o bot te envie mensagens proativas na sexta-feira.
+- `/help`: Exibe a lista de comandos disponíveis.
 - `/semana`: Força o bot a ler o seu Strava, o clima, o desgaste da sua bicicleta e o andamento da sua meta mensal naquele exato momento, gerando um resumo detalhado e uma dica de treino.
 - `/grafico`: Gera e envia uma imagem com o gráfico do seu saldo de quilometragem por dia nos últimos 30 dias. Excelente para ver a constância visualmente!
 - `/pedal`: Busca e analisa os dados detalhados do seu último pedal no Strava, indicando pontos fortes e o que melhorar.
@@ -121,6 +123,7 @@ Vá até o Telegram, busque pelo seu bot e envie os comandos:
 - `/clima`: Obtém a previsão do tempo detalhada e envia uma mensagem motivadora já adaptada às condições climáticas para o seu próximo pedal.
 - `/meta`: Sem argumento mostra a meta atual. Com argumento (ex: `/meta 200`) define sua meta mensal personalizada de quilometragem.
 - `/historico`: Mostra a evolução comparativa dos últimos 3 meses (km rodados e quantidade de pedais), com análise de tendências e motivação.
+- `/ranking`: Exibe o ranking de quilometragem do mês atual entre todos os membros da equipe que usam o bot, com direito a pódio (🥇🥈🥉)!
 
 **📷 Envio de Fotos**: Envie uma foto da trilha, bike, equipamento ou paisagem. O coach usa o Gemini multimodal para analisar a imagem e responder com dicas, elogios ou motivação!
 

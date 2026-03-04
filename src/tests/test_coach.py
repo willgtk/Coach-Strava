@@ -181,6 +181,53 @@ class TestMultiUsuario:
             meta = obter_meta_usuario("inexistente", 150.0)
             assert meta == 150.0
 
+    @patch('ai_engine.DB_PATH')
+    @patch('strava_service.obter_progresso_mensal')
+    def test_obter_ranking_usuarios(self, mock_progresso, mock_db_path) -> None:
+        """Verifica se o ranking é formatado corretamente e ordenado por km."""
+        with patch('ai_engine.DB_PATH', self.db_path):
+            from ai_engine import registrar_usuario, obter_ranking_usuarios
+            
+            # Limpar tabela (caso algum teste anterior não tenha isolado perfeitamente)
+            conn = sqlite3.connect(self.db_path)
+            conn.execute("DELETE FROM usuarios")
+            conn.commit()
+            conn.close()
+
+            registrar_usuario("555", "Líder")
+            registrar_usuario("666", "Segundo")
+
+            def side_effect(meta):
+                # Simular o retorno de progresso dependendo de quem chamou
+                # Vamos simplificar: se for O líder, retornamos mais KM.
+                # Precisaríamos saber se a meta é do lider, mas não sabemos.
+                # Vamos apenas retornar a mesma coisa sempre, ou usar um side_effect com iterador.
+                pass
+
+            mock_progresso.side_effect = [
+                {'total_km': 300, 'percentual_concluido': 200}, # Líder
+                {'total_km': 200, 'percentual_concluido': 133}  # Segundo
+            ]
+
+            ranking = obter_ranking_usuarios()
+            assert "🏆 Ranking Mensal da Equipe:" in ranking
+            assert "🥇 Líder: 300.0 km" in ranking
+            assert "🥈 Segundo: 200.0 km" in ranking
+
+    @patch('ai_engine.DB_PATH')
+    def test_obter_ranking_vazio(self, mock_db_path) -> None:
+        """Verifica o retorno do ranking quando não há usuários."""
+        with patch('ai_engine.DB_PATH', self.db_path):
+            from ai_engine import obter_ranking_usuarios
+            
+            conn = sqlite3.connect(self.db_path)
+            conn.execute("DELETE FROM usuarios")
+            conn.commit()
+            conn.close()
+
+            ranking = obter_ranking_usuarios()
+            assert "Nenhum usuário registrado ainda." in ranking
+
 
 # ==========================================
 # TESTES DE INTERCEPTADORES (constantes)

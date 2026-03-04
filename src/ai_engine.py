@@ -2,6 +2,7 @@
 Motor de IA do Coach-Strava.
 Gerencia memória persistente (SQLite), sessões de chat do Gemini e processamento de áudio.
 """
+from __future__ import annotations
 import os
 import threading
 import sqlite3
@@ -57,6 +58,9 @@ def init_db() -> None:
                         data_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 ''')
+                # Índices para performance em queries frequentes
+                c.execute('CREATE INDEX IF NOT EXISTS idx_conversas_chat_id ON conversas(chat_id)')
+                c.execute('CREATE INDEX IF NOT EXISTS idx_conversas_chat_role ON conversas(chat_id, role)')
                 conn.commit()
         except sqlite3.Error as e:
             logger.error(f"Erro ao inicializar o banco SQLite: {e}")
@@ -200,6 +204,55 @@ def atualizar_meta_usuario(chat_id: str, nova_meta: float) -> bool:
         except sqlite3.Error as e:
             logger.error(f"Erro ao atualizar meta do usuário: {e}")
             return False
+
+
+def obter_ranking_usuarios() -> str:
+    """Retorna ranking de km mensais entre todos os usuários registrados."""
+    from strava_service import obter_progresso_mensal as _progresso
+    usuarios = []
+    with _memory_lock:
+        try:
+            with get_db_connection() as conn:
+                c = conn.cursor()
+                c.execute('SELECT chat_id, nome, meta_mensal_km FROM usuarios')
+                usuarios = c.fetchall()
+        except sqlite3.Error as e:
+            logger.error(f"Erro ao obter ranking: {e}")
+            return "Erro ao buscar dados dos usuários."
+
+    if not usuarios:
+        return "Nenhum usuário registrado ainda."
+
+    ranking: list[dict] = []
+    for chat_id, nome, meta_km in usuarios:
+        meta_km = meta_km or 150.0
+        resultado = _progresso(meta_km)
+        if isinstance(resultado, dict):
+            ranking.append({
+                'nome': nome or f'Atleta {chat_id[-4:]}',
+                'km': resultado.get('total_km', 0),
+                'meta': meta_km,
+                'percentual': resultado.get('percentual_concluido', 0)
+            })
+        else:
+            ranking.append({
+                'nome': nome or f'Atleta {chat_id[-4:]}',
+                'km': 0,
+                'meta': meta_km,
+                'percentual': 0
+            })
+
+    # Ordenar por km (mais km = primeiro)
+    ranking.sort(key=lambda x: x['km'], reverse=True)
+
+    linhas = []
+    for i, r in enumerate(ranking, 1):
+        medalha = {1: '🥇', 2: '🥈', 3: '🥉'}.get(i, f'{i}.')
+        linhas.append(
+            f"{medalha} {r['nome']}: {r['km']:.1f} km ({r['percentual']:.0f}% da meta de {r['meta']:.0f}km)"
+        )
+
+    return "🏆 Ranking Mensal da Equipe:\n" + "\n".join(linhas)
 
 
 # ==========================================

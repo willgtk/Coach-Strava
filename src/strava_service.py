@@ -2,6 +2,7 @@
 Serviço de integração com a API do Strava.
 Gerencia autenticação, atividades, status da bike e geração de gráficos.
 """
+from __future__ import annotations
 import os
 import tempfile
 from typing import Optional

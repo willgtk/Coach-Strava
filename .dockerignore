@@ -1,10 +1,49 @@
-.env
-.env.example
+# ==========================================
+# .dockerignore — Coach-Strava
+# Exclui arquivos desnecessários da imagem Docker
+# ==========================================
+
+# Git
 .git
 .gitignore
+
+# Ambiente e secrets
+.env
+.env.*
+!.env.example
+
+# Banco de dados (montado via volume)
+*.db
+coach_database.db
+
+# Python
 __pycache__
+*.pyc
+*.pyo
+*.egg-info
+.eggs
 .pytest_cache
-src/tests/
-src/__pycache__
+
+# IDE / Editor
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Documentação e guias (não necessários no container)
+README.md
+GUIA_INICIANTES.md
+LICENSE
+
+# Docker (não copiar Docker files para dentro da imagem)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Artefatos de sistema
+.DS_Store
+Thumbs.db
+
+# Legados
 memoria_coach.json
-*.md

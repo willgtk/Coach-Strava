@@ -2,6 +2,7 @@
 Módulo de configuração central do Coach-Strava.
 Carrega variáveis de ambiente, configura logging e valida dependências.
 """
+from __future__ import annotations
 import os
 import logging
 from dotenv import load_dotenv

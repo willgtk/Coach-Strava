@@ -2,7 +2,11 @@
 Bot principal do Coach-Strava para Telegram.
 Gerencia comandos, conversas livres, áudio, fotos e mensagens proativas.
 """
+from __future__ import annotations
+
 import os
+import signal
+import sys
 import tempfile
 import schedule
 import time
@@ -23,7 +27,7 @@ from weather_service import obter_previsao_tempo
 from ai_engine import (
     get_chat_session, guardar_memoria, processar_mensagem_audio,
     processar_mensagem_foto, registrar_usuario, obter_todos_chat_ids,
-    obter_meta_usuario, atualizar_meta_usuario
+    obter_meta_usuario, atualizar_meta_usuario, obter_ranking_usuarios
 )
 from constantes import PALAVRAS_CLIMA, PALAVRAS_STRAVA, PALAVRAS_BIKE
 
@@ -34,6 +38,21 @@ bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
 # Limite de caracteres por mensagem do Telegram
 _MAX_MSG_LEN: int = 4096
+
+# Rate limiter simples: último timestamp de mensagem por chat_id
+_rate_limit: dict[str, float] = {}
+_RATE_LIMIT_SECONDS: float = 3.0
+
+
+def _check_rate_limit(chat_id: int | str) -> bool:
+    """Retorna True se o usuário pode enviar, False se está em cooldown."""
+    now = time.time()
+    key = str(chat_id)
+    last = _rate_limit.get(key, 0)
+    if now - last < _RATE_LIMIT_SECONDS:
+        return False
+    _rate_limit[key] = now
+    return True
 
 
 def enviar_resposta_segura(bot: telebot.TeleBot, chat_id: int | str, texto: str, reply_to=None) -> None:
@@ -118,7 +137,7 @@ def mensagem_planeamento_fim_de_semana() -> None:
             """
 
             session = get_chat_session(chat_id)
-            guardar_memoria(chat_id, "user", prompt)
+            guardar_memoria(chat_id, "user", "[AUTO] Resumo proativo de sexta-feira solicitado")
             resposta_ia = session.send_message(prompt)
             guardar_memoria(chat_id, "model", resposta_ia.text)
 
@@ -149,7 +168,7 @@ threading.Thread(target=agendador_em_segundo_plano, daemon=True).start()
 # ==========================================
 # ROTAS DO TELEGRAM
 # ==========================================
-@bot.message_handler(commands=['start', 'help'])
+@bot.message_handler(commands=['start'])
 def send_welcome(message) -> None:
     """Registra o chat ID e dá as boas-vindas."""
     chat_id = str(message.chat.id)
@@ -174,6 +193,29 @@ def send_welcome(message) -> None:
         "/clima — Previsão do tempo\n"
         "/meta — Definir sua meta mensal (ex: /meta 200)\n"
         "/historico — Evolução mensal comparativa\n"
+        "/ranking — Ranking de km entre membros\n"
+        "📷 Envie uma foto da trilha para análise!\n"
+        "🎙️ Envie um áudio como Walkie-Talkie!\n"
+        "Ou simplesmente converse comigo! 💬",
+        parse_mode='Markdown'
+    )
+
+
+@bot.message_handler(commands=['help'])
+def send_help(message) -> None:
+    """Exibe apenas a lista de comandos disponíveis."""
+    bot.reply_to(
+        message,
+        "📋 *Comandos disponíveis:*\n"
+        "/start — Registrar e ativar o coach\n"
+        "/semana — Resumo semanal completo e andamento da meta\n"
+        "/grafico — Gráfico de evolução de treino\n"
+        "/pedal — Dados do último pedal\n"
+        "/bike — Status da bicicleta\n"
+        "/clima — Previsão do tempo\n"
+        "/meta — Definir sua meta mensal (ex: /meta 200)\n"
+        "/historico — Evolução mensal comparativa\n"
+        "/ranking — Ranking de km entre membros\n"
         "📷 Envie uma foto da trilha para análise!\n"
         "🎙️ Envie um áudio como Walkie-Talkie!\n"
         "Ou simplesmente converse comigo! 💬",
@@ -185,6 +227,7 @@ def send_welcome(message) -> None:
 def enviar_grafico(message) -> None:
     """Comando /grafico: envia a imagem gerada com o volume de treino."""
     try:
+        bot.send_chat_action(message.chat.id, 'typing')
         msg_wait = bot.reply_to(message, "A desenhar o teu gráfico de evolução dos últimos 30 dias... 📊⏳")
         caminho_grafico = gerar_grafico_progresso(30)
 
@@ -209,6 +252,7 @@ def enviar_grafico(message) -> None:
 def analisar_semana(message) -> None:
     """Comando /semana: análise semanal com treino + clima + bike + meta."""
     try:
+        bot.send_chat_action(message.chat.id, 'typing')
         bot.reply_to(message, "A procurar dados de treino, metas do mês, clima e equipamento... ⏳")
 
         chat_id = str(message.chat.id)
@@ -226,7 +270,7 @@ def analisar_semana(message) -> None:
         )
 
         session = get_chat_session(chat_id)
-        guardar_memoria(chat_id, "user", prompt)
+        guardar_memoria(chat_id, "user", "[AUTO] Resumo semanal solicitado via /semana")
         resposta_ia = session.send_message(prompt)
         guardar_memoria(chat_id, "model", resposta_ia.text)
 
@@ -246,6 +290,7 @@ def analisar_semana(message) -> None:
 def ultimo_pedal(message) -> None:
     """Comando /pedal: mostra dados detalhados do último pedal."""
     try:
+        bot.send_chat_action(message.chat.id, 'typing')
         bot.reply_to(message, "A buscar o teu último pedal no Strava... 🚴⏳")
         dados_pedal = obter_ultimo_pedal()
         prompt = (
@@ -272,6 +317,7 @@ def ultimo_pedal(message) -> None:
 def status_bike(message) -> None:
     """Comando /bike: mostra status e dicas de manutenção da bicicleta."""
     try:
+        bot.send_chat_action(message.chat.id, 'typing')
         bot.reply_to(message, "A verificar a garagem... 🔧⏳")
         resultado = obter_status_bike()
         texto_bike, km, nome = resultado
@@ -304,6 +350,7 @@ def status_bike(message) -> None:
 def comando_clima(message) -> None:
     """Comando /clima: previsão do tempo com contexto de pedal."""
     try:
+        bot.send_chat_action(message.chat.id, 'typing')
         bot.reply_to(message, "A olhar para o céu... ☁️⏳")
         clima_atual = obter_previsao_tempo()
         prompt = (
@@ -356,6 +403,7 @@ def comando_meta(message) -> None:
         sucesso = atualizar_meta_usuario(chat_id, nova_meta)
 
         if sucesso:
+            bot.send_chat_action(message.chat.id, 'typing')
             session = get_chat_session(chat_id)
             prompt = f"O atleta acabou de atualizar sua meta mensal para {nova_meta:.0f} km. Parabenize e motive!"
             guardar_memoria(chat_id, "user", f"/meta {nova_meta:.0f}")
@@ -374,6 +422,7 @@ def comando_meta(message) -> None:
 def comando_historico(message) -> None:
     """Comando /historico: mostra evolução mensal comparativa."""
     try:
+        bot.send_chat_action(message.chat.id, 'typing')
         bot.reply_to(message, "A compilar o teu histórico de evolução... 📈⏳")
 
         historico = obter_historico_mensal(meses=3)
@@ -398,6 +447,35 @@ def comando_historico(message) -> None:
         enviar_resposta_segura(bot, message.chat.id, resposta_ia.text, reply_to=message)
     except Exception as e:
         logger.error(f"Erro no /historico: {e}")
+        bot.reply_to(message, "⚠️ Erro ao processar. Tente novamente em instantes.")
+
+
+@bot.message_handler(commands=['ranking'])
+def comando_ranking(message) -> None:
+    """Comando /ranking: mostra ranking de km entre membros registrados."""
+    try:
+        bot.send_chat_action(message.chat.id, 'typing')
+        bot.reply_to(message, "A montar o ranking da equipe... 🏆⏳")
+
+        ranking = obter_ranking_usuarios()
+
+        chat_id = str(message.chat.id)
+        prompt = (
+            f"O atleta pediu o ranking da equipe. "
+            f"[DADOS RANKING: {ranking}]. "
+            f"Monte uma apresentação divertida e motivadora do ranking, "
+            f"parabenize o líder, encoraje os demais, e use emojis de pódio "
+            f"(🥇🥈🥉) para os 3 primeiros."
+        )
+
+        session = get_chat_session(chat_id)
+        guardar_memoria(chat_id, "user", "/ranking")
+        resposta_ia = session.send_message(prompt)
+        guardar_memoria(chat_id, "model", resposta_ia.text)
+
+        enviar_resposta_segura(bot, message.chat.id, resposta_ia.text, reply_to=message)
+    except Exception as e:
+        logger.error(f"Erro no /ranking: {e}")
         bot.reply_to(message, "⚠️ Erro ao processar. Tente novamente em instantes.")
 
 
@@ -481,6 +559,14 @@ def receber_foto(message) -> None:
 def conversa_livre(message) -> None:
     """Handler de conversa livre com interceptação inteligente de contexto."""
     try:
+        # Guard: ignora mensagens sem texto (stickers, GIFs, documentos, etc.)
+        if not message.text:
+            return
+
+        # Rate limiting: evita spam de chamadas ao Gemini
+        if not _check_rate_limit(message.chat.id):
+            return
+
         bot.send_chat_action(message.chat.id, 'typing')
         texto_usuario = message.text.lower()
 
@@ -521,7 +607,21 @@ def conversa_livre(message) -> None:
 
 
 # ==========================================
+# GRACEFUL SHUTDOWN
+# ==========================================
+def _graceful_shutdown(signum, frame) -> None:
+    """Encerra o bot de forma limpa ao receber SIGTERM ou SIGINT."""
+    logger.info(f"Sinal {signum} recebido. Encerrando o bot de forma segura...")
+    bot.stop_polling()
+    logger.info("Bot encerrado com sucesso.")
+    sys.exit(0)
+
+
+signal.signal(signal.SIGINT, _graceful_shutdown)
+signal.signal(signal.SIGTERM, _graceful_shutdown)
+
+# ==========================================
 # ARRANQUE DO BOT
 # ==========================================
-logger.info("Coach 5.0 (Multi-Usuário + Conquistas + Foto + Histórico + Cache) ativo no Telegram!")
+logger.info("Coach 6.0 (Ranking + Rate Limit + Graceful Shutdown + Guards) ativo no Telegram!")
 bot.infinity_polling()
