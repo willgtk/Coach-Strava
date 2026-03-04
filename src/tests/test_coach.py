@@ -1,144 +1,218 @@
-import json
+"""
+Testes unitários do Coach-Strava.
+Cobre: memória SQLite, interceptadores, configuração e utilidades do bot.
+"""
 import os
 import tempfile
-import pytest
+import sqlite3
+from typing import Optional
 from unittest.mock import patch, MagicMock
 
+import pytest
+
 
 # ==========================================
-# TESTES DE MEMÓRIA (ai_engine)
+# TESTES DE MEMÓRIA (SQLite — ai_engine)
 # ==========================================
-class TestMemoria:
-    """Testes para as funções de memória persistente."""
+class TestMemoriaSQLite:
+    """Testes para as funções de memória persistente com SQLite."""
 
-    def setup_method(self):
-        """Cria um ficheiro temporário para cada teste."""
-        self.tmp = tempfile.NamedTemporaryFile(
-            mode='w', suffix='.json', delete=False, encoding='utf-8'
-        )
-        self.tmp.write('[]')
-        self.tmp.close()
-        self.filepath = self.tmp.name
+    def setup_method(self) -> None:
+        """Cria um banco SQLite temporário para cada teste."""
+        self.tmp_db = tempfile.NamedTemporaryFile(suffix='.db', delete=False)
+        self.tmp_db.close()
+        self.db_path = self.tmp_db.name
 
-    def teardown_method(self):
-        """Remove o ficheiro temporário."""
-        if os.path.exists(self.filepath):
-            os.remove(self.filepath)
+        # Cria a tabela de conversas
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS conversas (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                chat_id TEXT NOT NULL,
+                role TEXT NOT NULL,
+                mensagem TEXT NOT NULL,
+                data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS usuarios (
+                chat_id TEXT PRIMARY KEY,
+                nome TEXT,
+                meta_mensal_km REAL DEFAULT 150.0,
+                data_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        conn.commit()
+        conn.close()
 
-    @patch('ai_engine.FICHEIRO_MEMORIA')
-    def test_guardar_e_carregar_memoria(self, mock_path):
-        """Verifica que guardar e carregar memória funciona."""
-        mock_path.__str__ = lambda s: self.filepath
-        # Patch para que o módulo use nosso ficheiro temporário
-        with patch('ai_engine.FICHEIRO_MEMORIA', self.filepath):
+    def teardown_method(self) -> None:
+        """Remove o banco temporário."""
+        if os.path.exists(self.db_path):
+            os.remove(self.db_path)
+
+    @patch('ai_engine.DB_PATH')
+    def test_guardar_e_carregar_memoria(self, mock_db_path) -> None:
+        """Verifica que guardar e carregar memória funciona com SQLite."""
+        with patch('ai_engine.DB_PATH', self.db_path):
             from ai_engine import guardar_memoria
 
-            guardar_memoria("user", "Olá")
-            guardar_memoria("model", "Olá, campeão!")
+            guardar_memoria("12345", "user", "Olá")
+            guardar_memoria("12345", "model", "Olá, campeão!")
 
-            with open(self.filepath, 'r', encoding='utf-8') as f:
-                resultado = json.load(f)
+            conn = sqlite3.connect(self.db_path)
+            c = conn.cursor()
+            c.execute('SELECT role, mensagem FROM conversas WHERE chat_id = ? ORDER BY id', ("12345",))
+            resultado = c.fetchall()
+            conn.close()
 
             assert len(resultado) == 2
-            assert resultado[0]['role'] == 'user'
-            assert resultado[0]['text'] == 'Olá'
-            assert resultado[1]['role'] == 'model'
-            assert resultado[1]['text'] == 'Olá, campeão!'
+            assert resultado[0][0] == 'user'
+            assert resultado[0][1] == 'Olá'
+            assert resultado[1][0] == 'model'
+            assert resultado[1][1] == 'Olá, campeão!'
 
-    def test_memoria_vazia(self):
-        """Verifica que ficheiro vazio retorna lista vazia."""
-        with open(self.filepath, 'r', encoding='utf-8') as f:
-            resultado = json.load(f)
-        assert resultado == []
+    def test_banco_vazio_retorna_vazio(self) -> None:
+        """Verifica que banco vazio retorna lista vazia."""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute('SELECT COUNT(*) FROM conversas')
+        count = c.fetchone()[0]
+        conn.close()
+        assert count == 0
 
-    def test_memoria_corrompida_retorna_vazio(self):
-        """Verifica que JSON corrompido não causa crash."""
-        with open(self.filepath, 'w', encoding='utf-8') as f:
-            f.write('{invalid json}}}')
-
-        with pytest.raises(json.JSONDecodeError):
-            with open(self.filepath, 'r', encoding='utf-8') as f:
-                json.load(f)
-
-    @patch('ai_engine.FICHEIRO_MEMORIA')
-    def test_limite_40_mensagens(self, mock_path):
-        """Verifica que o histórico é limitado a 40 mensagens."""
-        with patch('ai_engine.FICHEIRO_MEMORIA', self.filepath):
+    @patch('ai_engine.DB_PATH')
+    def test_isolamento_por_chat_id(self, mock_db_path) -> None:
+        """Verifica que mensagens de diferentes usuários são isoladas."""
+        with patch('ai_engine.DB_PATH', self.db_path):
             from ai_engine import guardar_memoria
 
-            for i in range(50):
-                role = "user" if i % 2 == 0 else "model"
-                guardar_memoria(role, f"Mensagem {i}")
+            guardar_memoria("user_A", "user", "Mensagem A")
+            guardar_memoria("user_B", "user", "Mensagem B")
 
-            with open(self.filepath, 'r', encoding='utf-8') as f:
-                dados = json.load(f)
+            conn = sqlite3.connect(self.db_path)
+            c = conn.cursor()
+            c.execute('SELECT mensagem FROM conversas WHERE chat_id = ?', ("user_A",))
+            msgs_a = c.fetchall()
+            c.execute('SELECT mensagem FROM conversas WHERE chat_id = ?', ("user_B",))
+            msgs_b = c.fetchall()
+            conn.close()
 
-            assert len(dados) == 40
-            # As 10 primeiras devem ter sido descartadas
-            assert dados[0]['text'] == 'Mensagem 10'
+            assert len(msgs_a) == 1
+            assert msgs_a[0][0] == "Mensagem A"
+            assert len(msgs_b) == 1
+            assert msgs_b[0][0] == "Mensagem B"
 
-    def test_validacao_roles_alternados(self):
+    def test_validacao_roles_alternados(self) -> None:
         """Verifica que mensagem órfã de user é removida ao carregar."""
-        dados = [
-            {"role": "user", "text": "Pergunta 1"},
-            {"role": "model", "text": "Resposta 1"},
-            {"role": "user", "text": "Pergunta sem resposta"}
-        ]
-        with open(self.filepath, 'w', encoding='utf-8') as f:
-            json.dump(dados, f, ensure_ascii=False)
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute("INSERT INTO conversas (chat_id, role, mensagem) VALUES (?, ?, ?)", ("test", "user", "Pergunta 1"))
+        c.execute("INSERT INTO conversas (chat_id, role, mensagem) VALUES (?, ?, ?)", ("test", "model", "Resposta 1"))
+        c.execute("INSERT INTO conversas (chat_id, role, mensagem) VALUES (?, ?, ?)", ("test", "user", "Pergunta sem resposta"))
+        conn.commit()
+        conn.close()
 
-        with patch('ai_engine.FICHEIRO_MEMORIA', self.filepath):
+        with patch('ai_engine.DB_PATH', self.db_path):
             from ai_engine import carregar_memoria
-            resultado = carregar_memoria()
+            resultado = carregar_memoria("test")
 
+        # A última mensagem "user" deve ser removida (total: 2)
         assert len(resultado) == 2
 
 
 # ==========================================
-# TESTES DE INTERCEPTADORES
+# TESTES DE MULTI-USUÁRIO
+# ==========================================
+class TestMultiUsuario:
+    """Testa as funções de gestão de múltiplos usuários."""
+
+    def setup_method(self) -> None:
+        self.tmp_db = tempfile.NamedTemporaryFile(suffix='.db', delete=False)
+        self.tmp_db.close()
+        self.db_path = self.tmp_db.name
+
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS usuarios (
+                chat_id TEXT PRIMARY KEY,
+                nome TEXT,
+                meta_mensal_km REAL DEFAULT 150.0,
+                data_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        conn.commit()
+        conn.close()
+
+    def teardown_method(self) -> None:
+        if os.path.exists(self.db_path):
+            os.remove(self.db_path)
+
+    @patch('ai_engine.DB_PATH')
+    def test_registrar_e_obter_usuarios(self, mock_db_path) -> None:
+        """Verifica registro e listagem de múltiplos usuários."""
+        with patch('ai_engine.DB_PATH', self.db_path):
+            from ai_engine import registrar_usuario, obter_todos_chat_ids
+
+            registrar_usuario("111", "Alice")
+            registrar_usuario("222", "Bob")
+
+            ids = obter_todos_chat_ids()
+            assert "111" in ids
+            assert "222" in ids
+
+    @patch('ai_engine.DB_PATH')
+    def test_meta_personalizada(self, mock_db_path) -> None:
+        """Verifica que a meta pode ser personalizada por usuário."""
+        with patch('ai_engine.DB_PATH', self.db_path):
+            from ai_engine import registrar_usuario, atualizar_meta_usuario, obter_meta_usuario
+
+            registrar_usuario("333", "Carlos")
+            atualizar_meta_usuario("333", 250.0)
+            meta = obter_meta_usuario("333", 150.0)
+            assert meta == 250.0
+
+    @patch('ai_engine.DB_PATH')
+    def test_meta_padrao_quando_nao_definida(self, mock_db_path) -> None:
+        """Verifica que a meta padrão é retornada quando não há registro."""
+        with patch('ai_engine.DB_PATH', self.db_path):
+            from ai_engine import obter_meta_usuario
+            meta = obter_meta_usuario("inexistente", 150.0)
+            assert meta == 150.0
+
+
+# ==========================================
+# TESTES DE INTERCEPTADORES (constantes)
 # ==========================================
 class TestInterceptadores:
-    """Testa a lógica de detecção de palavras-chave."""
+    """Testa a lógica de detecção de palavras-chave usando constantes compartilhadas."""
 
-    def test_detecta_palavras_clima(self):
-        palavras_clima = ['clima', 'tempo', 'temperatura', 'chover', 'chuva', 'sol', 'frio', 'calor']
-        assert any(p in "como está o tempo hoje?" for p in palavras_clima)
-        assert any(p in "vai chover amanhã?" for p in palavras_clima)
-        assert not any(p in "me manda uma rota" for p in palavras_clima)
+    def test_detecta_palavras_clima(self) -> None:
+        from constantes import PALAVRAS_CLIMA
+        assert any(p in "como está o tempo hoje?" for p in PALAVRAS_CLIMA)
+        assert any(p in "vai chover amanhã?" for p in PALAVRAS_CLIMA)
+        assert not any(p in "me manda uma rota" for p in PALAVRAS_CLIMA)
 
-    def test_detecta_palavras_strava(self):
-        palavras_strava = [
-            'pedal', 'pedais', 'treino', 'treinos', 'resultado', 'resultados',
-            'hoje', 'ontem', 'semana', 'pedalei', 'andei', 'rodei',
-            'km', 'quilometro', 'quilômetro', 'distância', 'distancia',
-            'elevação', 'subida', 'subidas', 'desempenho', 'performance',
-            'avalie', 'avaliar', 'análise', 'analise', 'último', 'ultimo',
-            'strava'
-        ]
-        assert any(p in "avalie meu pedal de hoje" for p in palavras_strava)
-        assert any(p in "quanto km fiz na semana?" for p in palavras_strava)
-        assert any(p in "meu último treino" for p in palavras_strava)
+    def test_detecta_palavras_strava(self) -> None:
+        from constantes import PALAVRAS_STRAVA
+        assert any(p in "avalie meu pedal de hoje" for p in PALAVRAS_STRAVA)
+        assert any(p in "quanto km fiz na semana?" for p in PALAVRAS_STRAVA)
+        assert any(p in "meu último treino" for p in PALAVRAS_STRAVA)
 
-    def test_detecta_palavras_bike(self):
-        palavras_bike = [
-            'bike', 'bicicleta', 'manutenção', 'manutencao', 'corrente',
-            'freio', 'pastilha', 'relação', 'relacao', 'cassete',
-            'pneu', 'câmbio', 'cambio', 'kaéti', 'kaeti'
-        ]
-        assert any(p in "preciso trocar a corrente" for p in palavras_bike)
-        assert any(p in "como está a kaéti?" for p in palavras_bike)
-        assert not any(p in "bom dia!" for p in palavras_bike)
+    def test_detecta_palavras_bike(self) -> None:
+        from constantes import PALAVRAS_BIKE
+        assert any(p in "preciso trocar a corrente" for p in PALAVRAS_BIKE)
+        assert any(p in "como está a kaéti?" for p in PALAVRAS_BIKE)
+        assert not any(p in "bom dia!" for p in PALAVRAS_BIKE)
 
-    def test_nao_detecta_falso_positivo(self):
+    def test_nao_detecta_falso_positivo(self) -> None:
         """Verifica que mensagens genéricas não ativam interceptadores."""
-        palavras_clima = ['clima', 'tempo', 'temperatura', 'chover', 'chuva', 'sol', 'frio', 'calor']
-        palavras_strava = ['pedal', 'treino', 'km', 'strava']
-        palavras_bike = ['bike', 'bicicleta', 'corrente', 'freio']
-
+        from constantes import PALAVRAS_CLIMA, PALAVRAS_STRAVA, PALAVRAS_BIKE
         msg = "bom dia, tudo bem?"
-        assert not any(p in msg for p in palavras_clima)
-        assert not any(p in msg for p in palavras_strava)
-        assert not any(p in msg for p in palavras_bike)
+        assert not any(p in msg for p in PALAVRAS_CLIMA)
+        assert not any(p in msg for p in PALAVRAS_STRAVA)
+        assert not any(p in msg for p in PALAVRAS_BIKE)
 
 
 # ==========================================
@@ -147,32 +221,36 @@ class TestInterceptadores:
 class TestConfig:
     """Testa a configuração e variáveis de ambiente."""
 
-    def test_cidade_padrao(self):
-        """Verifica que a cidade padrão é Curitiba,BR."""
+    def test_cidade_padrao(self) -> None:
         cidade = os.getenv('CITY', 'Curitiba,BR')
         assert 'Curitiba' in cidade or cidade == os.getenv('CITY')
 
-    def test_formato_cidade(self):
-        """Verifica que o formato da cidade está correto."""
+    def test_formato_cidade(self) -> None:
         cidade = 'Curitiba,BR'
         assert ',' in cidade
         partes = cidade.split(',')
         assert len(partes) == 2
-        assert len(partes[1]) == 2  # Código do país tem 2 caracteres
+        assert len(partes[1]) == 2
 
-    def test_team_name_padrao(self):
-        """Verifica que o nome da equipe padrão está definido."""
+    def test_team_name_padrao(self) -> None:
         team = os.getenv('TEAM_NAME', 'Equipe Partiu Pedal')
         assert len(team) > 0
+
+    def test_tipos_pedal_definidos(self) -> None:
+        """Verifica que os tipos de pedal estão corretamente definidos."""
+        from constantes import TIPOS_PEDAL
+        assert "Ride" in TIPOS_PEDAL
+        assert "VirtualRide" in TIPOS_PEDAL
+        assert "MountainBikeRide" in TIPOS_PEDAL
 
 
 # ==========================================
 # TESTES DE UTILIDADES DO BOT
 # ==========================================
-_MAX_MSG_LEN = 4096
+_MAX_MSG_LEN: int = 4096
 
 
-def _enviar_resposta_segura(bot, chat_id, texto, reply_to=None):
+def _enviar_resposta_segura(bot, chat_id: str, texto: str, reply_to=None) -> None:
     """Cópia local da função para teste sem importar bot_coach (evita iniciar o bot)."""
     for i in range(0, len(texto), _MAX_MSG_LEN):
         pedaco = texto[i:i + _MAX_MSG_LEN]
@@ -185,26 +263,18 @@ def _enviar_resposta_segura(bot, chat_id, texto, reply_to=None):
 class TestEnviarRespostaSegura:
     """Testa a lógica de envio seguro de mensagens longas."""
 
-    def test_mensagem_curta_envia_direto(self):
-        """Mensagem curta deve ser enviada numa única chamada."""
+    def test_mensagem_curta_envia_direto(self) -> None:
         mock_bot = MagicMock()
         mock_reply = MagicMock()
-
         _enviar_resposta_segura(mock_bot, "123", "Olá!", reply_to=mock_reply)
-
         mock_bot.reply_to.assert_called_once_with(mock_reply, "Olá!")
         mock_bot.send_message.assert_not_called()
 
-    def test_mensagem_longa_divide(self):
-        """Mensagem maior que 4096 chars deve ser dividida em pedaços."""
+    def test_mensagem_longa_divide(self) -> None:
         mock_bot = MagicMock()
-
         texto_grande = "A" * 5000
         _enviar_resposta_segura(mock_bot, "123", texto_grande)
-
-        # Sem reply_to, tudo vai por send_message
         assert mock_bot.send_message.call_count == 2
-        # Primeiro pedaço = 4096 chars, segundo = 904 chars
         args1 = mock_bot.send_message.call_args_list[0]
         args2 = mock_bot.send_message.call_args_list[1]
         assert len(args1[0][1]) == 4096

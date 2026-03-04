@@ -3,6 +3,7 @@
 
 # Memória persistente do bot
 coach_database.db
+memoria_coach.json
 
 # Python
 __pycache__/

@@ -1,12 +1,22 @@
+"""
+Serviço de previsão do tempo via OpenWeather API.
+"""
 import requests
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
 from config import OPENWEATHER_API_KEY, CITY, logger
+
 
 # ==========================================
 # SERVIÇO DE CLIMA (OPENWEATHER)
 # ==========================================
-
-
-def obter_previsao_tempo():
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    retry=retry_if_exception_type(requests.exceptions.Timeout),
+    reraise=True
+)
+def obter_previsao_tempo() -> str:
     """Retorna previsão do tempo das próximas 24h para a cidade configurada."""
     if not OPENWEATHER_API_KEY:
         return "Clima: API Key não configurada."
@@ -28,7 +38,7 @@ def obter_previsao_tempo():
         return resumo
     except requests.exceptions.Timeout:
         logger.error("Timeout ao buscar previsão do tempo.")
-        return "Erro: tempo esgotado ao buscar previsão do tempo."
+        raise  # Re-raise para o tenacity tentar novamente
     except Exception as e:
         logger.error(f"Erro ao buscar previsão: {e}")
         return f"Erro ao buscar previsão: {e}"

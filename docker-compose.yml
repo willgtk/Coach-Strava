@@ -9,6 +9,11 @@ services:
     env_file:
       - .env
     volumes:
-      # Cria um volume mapeando a memória local para dentro do container
-      # Se o arquivo não existir localmente, crie um vazio antes de rodar.
+      # Mapeia o banco de dados de memória para persistência
       - ./coach_database.db:/app/coach_database.db
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('https://api.telegram.org', timeout=5)"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
