@@ -23,8 +23,9 @@ _memory_lock = threading.Lock()
 # ==========================================
 @contextmanager
 def get_db_connection():
-    """Abre e fecha uma conexão SQLite de forma segura."""
-    conn = sqlite3.connect(DB_PATH)
+    """Abre e fecha uma conexão SQLite de forma segura com WAL mode."""
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    conn.execute("PRAGMA journal_mode=WAL")
     try:
         yield conn
     finally:
@@ -63,7 +64,8 @@ def init_db() -> None:
                 c.execute('CREATE INDEX IF NOT EXISTS idx_conversas_chat_role ON conversas(chat_id, role)')
                 conn.commit()
         except sqlite3.Error as e:
-            logger.error(f"Erro ao inicializar o banco SQLite: {e}")
+            logger.critical(f"Erro fatal ao inicializar o banco SQLite: {e}")
+            raise SystemExit(1)
 
 
 # Inicializa o banco assim que o módulo for carregado

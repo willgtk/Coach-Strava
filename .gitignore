@@ -1,7 +1,10 @@
 # Variáveis de ambiente (chaves de API)
 .env
+**/.env
 
 # Memória persistente do bot
+*.db
+data/
 coach_database.db
 memoria_coach.json
 

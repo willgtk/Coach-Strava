@@ -46,8 +46,10 @@ except ValueError:
     logger.warning("Valor inválido para META_MENSAL_KM. Usando o padrão de 150km.")
     META_MENSAL_KM = 150.0
 
-# Caminho do banco de dados SQLite (na raiz do projeto)
-DB_PATH: str = os.path.join(_project_root, 'coach_database.db')
+# Caminho do banco de dados SQLite (no diretório data/)
+_data_dir: str = os.path.join(_project_root, 'data')
+os.makedirs(_data_dir, exist_ok=True)
+DB_PATH: str = os.path.join(_data_dir, 'coach_database.db')
 
 # ==========================================
 # VALIDAÇÃO DE VARIÁVEIS OBRIGATÓRIAS

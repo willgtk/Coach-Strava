@@ -9,11 +9,14 @@ services:
     env_file:
       - .env
     volumes:
-      # Mapeia o banco de dados de memória para persistência
-      - ./coach_database.db:/app/coach_database.db
+      # Volume nomeado para persistência segura do banco
+      - coach_data:/app/data
     healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('https://api.telegram.org', timeout=5)"]
+      test: ["CMD", "python", "-c", "import os,time; assert time.time()-float(open('/tmp/bot_health').read())<120"]
       interval: 60s
       timeout: 10s
       retries: 3
       start_period: 30s
+
+volumes:
+  coach_data:

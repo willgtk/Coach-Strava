@@ -15,6 +15,7 @@ from typing import Optional
 
 from dotenv import set_key
 import telebot
+from cachetools import TTLCache
 
 from config import TELEGRAM_TOKEN, TEAM_NAME, META_MENSAL_KM, env_path, logger
 from strava_service import (
@@ -39,20 +40,47 @@ bot = telebot.TeleBot(TELEGRAM_TOKEN)
 # Limite de caracteres por mensagem do Telegram
 _MAX_MSG_LEN: int = 4096
 
-# Rate limiter simples: último timestamp de mensagem por chat_id
-_rate_limit: dict[str, float] = {}
+# Rate limiter com expiração automática (evita vazamento de memória)
 _RATE_LIMIT_SECONDS: float = 3.0
+_rate_limit: TTLCache = TTLCache(maxsize=1000, ttl=_RATE_LIMIT_SECONDS)
+
+# Caminho do arquivo de heartbeat para o healthcheck do Docker
+_HEALTH_FILE: str = '/tmp/bot_health'
+
+# Texto reutilizável da lista de comandos
+TEXTO_COMANDOS: str = (
+    "📋 *Comandos disponíveis:*\n"
+    "/start — Registrar e ativar o coach\n"
+    "/semana — Resumo semanal completo e andamento da meta\n"
+    "/grafico — Gráfico de evolução de treino\n"
+    "/pedal — Dados do último pedal\n"
+    "/bike — Status da bicicleta\n"
+    "/clima — Previsão do tempo\n"
+    "/meta — Definir sua meta mensal (ex: /meta 200)\n"
+    "/historico — Evolução mensal comparativa\n"
+    "/ranking — Ranking de km entre membros\n"
+    "📷 Envie uma foto da trilha para análise!\n"
+    "🎙️ Envie um áudio como Walkie-Talkie!\n"
+    "Ou simplesmente converse comigo! 💬"
+)
 
 
 def _check_rate_limit(chat_id: int | str) -> bool:
     """Retorna True se o usuário pode enviar, False se está em cooldown."""
-    now = time.time()
     key = str(chat_id)
-    last = _rate_limit.get(key, 0)
-    if now - last < _RATE_LIMIT_SECONDS:
+    if key in _rate_limit:
         return False
-    _rate_limit[key] = now
+    _rate_limit[key] = True
     return True
+
+
+def _escrever_heartbeat() -> None:
+    """Escreve timestamp para o healthcheck do Docker."""
+    try:
+        with open(_HEALTH_FILE, 'w') as f:
+            f.write(str(time.time()))
+    except OSError:
+        pass
 
 
 def enviar_resposta_segura(bot: telebot.TeleBot, chat_id: int | str, texto: str, reply_to=None) -> None:
@@ -154,15 +182,11 @@ def mensagem_planeamento_fim_de_semana() -> None:
 
 
 def agendador_em_segundo_plano() -> None:
-    """Loop do agendador que roda em background."""
+    """Loop do agendador que roda em background, com heartbeat para healthcheck."""
     while True:
         schedule.run_pending()
+        _escrever_heartbeat()
         time.sleep(1)
-
-
-# Agendamento: Sexta-feira às 18:00
-schedule.every().friday.at("18:00").do(mensagem_planeamento_fim_de_semana)
-threading.Thread(target=agendador_em_segundo_plano, daemon=True).start()
 
 
 # ==========================================
@@ -185,18 +209,7 @@ def send_welcome(message) -> None:
         f"Coach Inteligente ativado, {nome}! 🚵‍♂️\n"
         "Já registrei o teu contato. Agora monitorizo o teu Strava, "
         "o desgaste da tua bicicleta e o clima! SIMBOOOORA!\n\n"
-        "📋 *Comandos disponíveis:*\n"
-        "/semana — Resumo semanal completo e andamento da meta\n"
-        "/grafico — Gráfico de evolução de treino\n"
-        "/pedal — Dados do último pedal\n"
-        "/bike — Status da bicicleta\n"
-        "/clima — Previsão do tempo\n"
-        "/meta — Definir sua meta mensal (ex: /meta 200)\n"
-        "/historico — Evolução mensal comparativa\n"
-        "/ranking — Ranking de km entre membros\n"
-        "📷 Envie uma foto da trilha para análise!\n"
-        "🎙️ Envie um áudio como Walkie-Talkie!\n"
-        "Ou simplesmente converse comigo! 💬",
+        f"{TEXTO_COMANDOS}",
         parse_mode='Markdown'
     )
 
@@ -204,23 +217,7 @@ def send_welcome(message) -> None:
 @bot.message_handler(commands=['help'])
 def send_help(message) -> None:
     """Exibe apenas a lista de comandos disponíveis."""
-    bot.reply_to(
-        message,
-        "📋 *Comandos disponíveis:*\n"
-        "/start — Registrar e ativar o coach\n"
-        "/semana — Resumo semanal completo e andamento da meta\n"
-        "/grafico — Gráfico de evolução de treino\n"
-        "/pedal — Dados do último pedal\n"
-        "/bike — Status da bicicleta\n"
-        "/clima — Previsão do tempo\n"
-        "/meta — Definir sua meta mensal (ex: /meta 200)\n"
-        "/historico — Evolução mensal comparativa\n"
-        "/ranking — Ranking de km entre membros\n"
-        "📷 Envie uma foto da trilha para análise!\n"
-        "🎙️ Envie um áudio como Walkie-Talkie!\n"
-        "Ou simplesmente converse comigo! 💬",
-        parse_mode='Markdown'
-    )
+    bot.reply_to(message, TEXTO_COMANDOS, parse_mode='Markdown')
 
 
 @bot.message_handler(commands=['grafico'])
@@ -617,11 +614,24 @@ def _graceful_shutdown(signum, frame) -> None:
     sys.exit(0)
 
 
-signal.signal(signal.SIGINT, _graceful_shutdown)
-signal.signal(signal.SIGTERM, _graceful_shutdown)
-
 # ==========================================
 # ARRANQUE DO BOT
 # ==========================================
-logger.info("Coach 6.0 (Ranking + Rate Limit + Graceful Shutdown + Guards) ativo no Telegram!")
-bot.infinity_polling()
+def main() -> None:
+    """Inicializa o agendador, sinais e inicia o polling do bot."""
+    signal.signal(signal.SIGINT, _graceful_shutdown)
+    signal.signal(signal.SIGTERM, _graceful_shutdown)
+
+    # Agendamento: Sexta-feira às 18:00
+    schedule.every().friday.at("18:00").do(mensagem_planeamento_fim_de_semana)
+    threading.Thread(target=agendador_em_segundo_plano, daemon=True).start()
+
+    # Heartbeat inicial
+    _escrever_heartbeat()
+
+    logger.info("Coach 7.0 (WAL + Healthcheck + TTLCache + main guard) ativo no Telegram!")
+    bot.infinity_polling()
+
+
+if __name__ == '__main__':
+    main()

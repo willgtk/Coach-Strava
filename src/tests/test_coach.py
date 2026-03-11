@@ -1,6 +1,7 @@
 """
 Testes unitários do Coach-Strava.
-Cobre: memória SQLite, interceptadores, configuração e utilidades do bot.
+Cobre: memória SQLite, interceptadores, configuração, utilidades do bot,
+       e cobertura de serviços (weather cache, strava retry).
 """
 import os
 import tempfile
@@ -187,8 +188,8 @@ class TestMultiUsuario:
         """Verifica se o ranking é formatado corretamente e ordenado por km."""
         with patch('ai_engine.DB_PATH', self.db_path):
             from ai_engine import registrar_usuario, obter_ranking_usuarios
-            
-            # Limpar tabela (caso algum teste anterior não tenha isolado perfeitamente)
+
+            # Limpar tabela
             conn = sqlite3.connect(self.db_path)
             conn.execute("DELETE FROM usuarios")
             conn.commit()
@@ -197,16 +198,9 @@ class TestMultiUsuario:
             registrar_usuario("555", "Líder")
             registrar_usuario("666", "Segundo")
 
-            def side_effect(meta):
-                # Simular o retorno de progresso dependendo de quem chamou
-                # Vamos simplificar: se for O líder, retornamos mais KM.
-                # Precisaríamos saber se a meta é do lider, mas não sabemos.
-                # Vamos apenas retornar a mesma coisa sempre, ou usar um side_effect com iterador.
-                pass
-
             mock_progresso.side_effect = [
-                {'total_km': 300, 'percentual_concluido': 200}, # Líder
-                {'total_km': 200, 'percentual_concluido': 133}  # Segundo
+                {'total_km': 300, 'percentual_concluido': 200},  # Líder
+                {'total_km': 200, 'percentual_concluido': 133}   # Segundo
             ]
 
             ranking = obter_ranking_usuarios()
@@ -219,7 +213,7 @@ class TestMultiUsuario:
         """Verifica o retorno do ranking quando não há usuários."""
         with patch('ai_engine.DB_PATH', self.db_path):
             from ai_engine import obter_ranking_usuarios
-            
+
             conn = sqlite3.connect(self.db_path)
             conn.execute("DELETE FROM usuarios")
             conn.commit()
@@ -293,36 +287,117 @@ class TestConfig:
 
 # ==========================================
 # TESTES DE UTILIDADES DO BOT
+# (Agora importando diretamente de bot_coach graças ao main guard)
 # ==========================================
-_MAX_MSG_LEN: int = 4096
-
-
-def _enviar_resposta_segura(bot, chat_id: str, texto: str, reply_to=None) -> None:
-    """Cópia local da função para teste sem importar bot_coach (evita iniciar o bot)."""
-    for i in range(0, len(texto), _MAX_MSG_LEN):
-        pedaco = texto[i:i + _MAX_MSG_LEN]
-        if reply_to and i == 0:
-            bot.reply_to(reply_to, pedaco)
-        else:
-            bot.send_message(chat_id, pedaco)
-
-
 class TestEnviarRespostaSegura:
     """Testa a lógica de envio seguro de mensagens longas."""
 
     def test_mensagem_curta_envia_direto(self) -> None:
+        from bot_coach import enviar_resposta_segura
         mock_bot = MagicMock()
         mock_reply = MagicMock()
-        _enviar_resposta_segura(mock_bot, "123", "Olá!", reply_to=mock_reply)
+        enviar_resposta_segura(mock_bot, "123", "Olá!", reply_to=mock_reply)
         mock_bot.reply_to.assert_called_once_with(mock_reply, "Olá!")
         mock_bot.send_message.assert_not_called()
 
     def test_mensagem_longa_divide(self) -> None:
+        from bot_coach import enviar_resposta_segura
         mock_bot = MagicMock()
         texto_grande = "A" * 5000
-        _enviar_resposta_segura(mock_bot, "123", texto_grande)
+        enviar_resposta_segura(mock_bot, "123", texto_grande)
         assert mock_bot.send_message.call_count == 2
         args1 = mock_bot.send_message.call_args_list[0]
         args2 = mock_bot.send_message.call_args_list[1]
         assert len(args1[0][1]) == 4096
         assert len(args2[0][1]) == 904
+
+    def test_texto_comandos_constante_definida(self) -> None:
+        """Verifica que TEXTO_COMANDOS existe e contém todos os comandos."""
+        from bot_coach import TEXTO_COMANDOS
+        assert "/start" in TEXTO_COMANDOS
+        assert "/semana" in TEXTO_COMANDOS
+        assert "/pedal" in TEXTO_COMANDOS
+        assert "/bike" in TEXTO_COMANDOS
+        assert "/clima" in TEXTO_COMANDOS
+        assert "/meta" in TEXTO_COMANDOS
+        assert "/historico" in TEXTO_COMANDOS
+        assert "/ranking" in TEXTO_COMANDOS
+        assert "/grafico" in TEXTO_COMANDOS
+
+
+# ==========================================
+# TESTES DE WEATHER SERVICE
+# ==========================================
+class TestWeatherService:
+    """Testa cache e tratamento de erros do serviço de clima."""
+
+    @patch('weather_service.requests.get')
+    def test_weather_cache_hit(self, mock_get) -> None:
+        """Verifica que o cache evita chamadas duplicadas à API."""
+        from weather_service import _weather_cache, obter_previsao_tempo, CITY
+
+        # Limpar cache
+        _weather_cache.clear()
+
+        # Simular resposta da API
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            'cod': '200',
+            'list': [
+                {'dt_txt': '2026-03-11 12:00:00', 'main': {'temp': 25}, 'weather': [{'description': 'céu limpo'}]},
+                {'dt_txt': '2026-03-11 15:00:00', 'main': {'temp': 27}, 'weather': [{'description': 'poucas nuvens'}]},
+                {'dt_txt': '2026-03-11 18:00:00', 'main': {'temp': 23}, 'weather': [{'description': 'nublado'}]},
+                {'dt_txt': '2026-03-11 21:00:00', 'main': {'temp': 20}, 'weather': [{'description': 'céu limpo'}]},
+                {'dt_txt': '2026-03-12 00:00:00', 'main': {'temp': 18}, 'weather': [{'description': 'céu limpo'}]},
+                {'dt_txt': '2026-03-12 03:00:00', 'main': {'temp': 16}, 'weather': [{'description': 'orvalho'}]},
+                {'dt_txt': '2026-03-12 06:00:00', 'main': {'temp': 15}, 'weather': [{'description': 'neblina'}]},
+                {'dt_txt': '2026-03-12 09:00:00', 'main': {'temp': 19}, 'weather': [{'description': 'sol'}]},
+            ]
+        }
+        mock_get.return_value = mock_response
+
+        # Primeira chamada: deve chamar a API
+        resultado1 = obter_previsao_tempo()
+        assert mock_get.call_count == 1
+
+        # Segunda chamada: deve usar cache
+        resultado2 = obter_previsao_tempo()
+        assert mock_get.call_count == 1  # Mesmo count = cache hit
+        assert resultado1 == resultado2
+
+
+# ==========================================
+# TESTES DO STRAVA SERVICE
+# ==========================================
+class TestStravaService:
+    """Testa funções do serviço Strava."""
+
+    def test_filtrar_pedais(self) -> None:
+        """Verifica que a filtragem de pedais funciona corretamente."""
+        from strava_service import _filtrar_pedais
+
+        atividade_ride = MagicMock()
+        atividade_ride.type = "Ride"
+
+        atividade_run = MagicMock()
+        atividade_run.type = "Run"
+
+        atividade_mtb = MagicMock()
+        atividade_mtb.type = "MountainBikeRide"
+
+        resultado = _filtrar_pedais([atividade_ride, atividade_run, atividade_mtb])
+        assert len(resultado) == 2
+        assert atividade_ride in resultado
+        assert atividade_mtb in resultado
+        assert atividade_run not in resultado
+
+    @patch('strava_service._obter_atividades')
+    def test_obter_atividades_com_retry_success(self, mock_obter) -> None:
+        """Verifica que o retry funciona na primeira tentativa."""
+        from strava_service import _obter_atividades_com_retry
+        from datetime import datetime
+
+        mock_obter.return_value = ["atividade1"]
+        resultado = _obter_atividades_com_retry(after=datetime.now())
+        assert resultado == ["atividade1"]
+

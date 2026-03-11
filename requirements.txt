@@ -8,3 +8,4 @@ pandas==2.2.3
 matplotlib==3.9.4
 tenacity==9.0.0
 cachetools==5.5.1
+python-dateutil==2.9.0

@@ -14,6 +14,7 @@ import matplotlib
 matplotlib.use('Agg')  # Backend não-interativo para evitar erros em servidores
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+from dateutil.relativedelta import relativedelta
 from dotenv import set_key
 from stravalib.client import Client
 from cachetools import TTLCache
@@ -89,7 +90,7 @@ def _obter_atividades(after: datetime) -> list:
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=2, max=10),
-    retry=retry_if_exception_type((requests.exceptions.Timeout, ConnectionError)),
+    retry=retry_if_exception_type((requests.exceptions.Timeout, requests.exceptions.ConnectionError, ConnectionError)),
     reraise=True
 )
 def _obter_atividades_com_retry(after: datetime) -> list:
@@ -219,31 +220,20 @@ def obter_historico_mensal(meses: int = 3) -> str:
     resumos: list[str] = []
 
     for i in range(meses):
-        # Calcula o primeiro e último dia de cada mês
+        primeiro_dia = (hoje.replace(day=1) - relativedelta(months=i)).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+
         if i == 0:
-            primeiro_dia = hoje.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             ultimo_dia = hoje
         else:
-            # Volta i meses
-            mes_alvo = hoje.month - i
-            ano_alvo = hoje.year
-            while mes_alvo <= 0:
-                mes_alvo += 12
-                ano_alvo -= 1
-            primeiro_dia = hoje.replace(year=ano_alvo, month=mes_alvo, day=1, hour=0, minute=0, second=0, microsecond=0)
-
-            # Último dia do mês
-            proximo_mes = mes_alvo + 1
-            proximo_ano = ano_alvo
-            if proximo_mes > 12:
-                proximo_mes = 1
-                proximo_ano += 1
-            ultimo_dia = datetime(proximo_ano, proximo_mes, 1) - timedelta(seconds=1)
+            # Último dia do mês: primeiro dia do próximo mês menos 1 segundo
+            ultimo_dia = (primeiro_dia + relativedelta(months=1)) - timedelta(seconds=1)
 
         try:
             atividades = _obter_atividades_com_retry(after=primeiro_dia)
             pedais = [act for act in _filtrar_pedais(atividades)
-                      if act.start_date_local <= ultimo_dia]
+                      if act.start_date_local.replace(tzinfo=None) <= ultimo_dia]
             total_km = sum(float(act.distance) / 1000 for act in pedais)
             qtd = len(pedais)
             nome_mes = primeiro_dia.strftime('%B/%Y').capitalize()
@@ -297,35 +287,36 @@ def gerar_grafico_progresso(dias_historico: int = 30) -> Optional[str]:
     plt.style.use('dark_background' if 'dark_background' in plt.style.available else 'default')
     fig, ax = plt.subplots(figsize=(10, 5))
 
-    barras = ax.bar(df_completo['data'], df_completo['km'], color='#fc4c02', alpha=0.8, edgecolor='white', width=0.8)
+    try:
+        barras = ax.bar(df_completo['data'], df_completo['km'], color='#fc4c02', alpha=0.8, edgecolor='white', width=0.8)
 
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m'))
-    plt.xticks(rotation=45)
-    plt.title(f'Volume de Treinos (Últimos {dias_historico} dias)', fontsize=14, pad=15, color='white')
-    plt.ylabel('Distância (km)', fontsize=12, color='white')
-    plt.xlabel('Data', fontsize=12, color='white')
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m'))
+        plt.xticks(rotation=45)
+        plt.title(f'Volume de Treinos (Últimos {dias_historico} dias)', fontsize=14, pad=15, color='white')
+        plt.ylabel('Distância (km)', fontsize=12, color='white')
+        plt.xlabel('Data', fontsize=12, color='white')
 
-    ax.grid(axis='y', linestyle='--', alpha=0.3)
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['left'].set_color('#aaaaaa')
-    ax.spines['bottom'].set_color('#aaaaaa')
-    ax.tick_params(colors='#aaaaaa')
+        ax.grid(axis='y', linestyle='--', alpha=0.3)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_color('#aaaaaa')
+        ax.spines['bottom'].set_color('#aaaaaa')
+        ax.tick_params(colors='#aaaaaa')
 
-    for bar in barras:
-        altura = bar.get_height()
-        if altura > 0:
-            ax.text(bar.get_x() + bar.get_width() / 2, altura + 0.5, f'{altura:.1f}',
-                    ha='center', va='bottom', fontsize=9, color='white')
+        for bar in barras:
+            altura = bar.get_height()
+            if altura > 0:
+                ax.text(bar.get_x() + bar.get_width() / 2, altura + 0.5, f'{altura:.1f}',
+                        ha='center', va='bottom', fontsize=9, color='white')
 
-    plt.tight_layout()
+        plt.tight_layout()
 
-    # Salva em arquivo temporário seguro
-    tmp_file = tempfile.NamedTemporaryFile(suffix='.png', prefix='grafico_', delete=False)
-    caminho_arquivo = tmp_file.name
-    tmp_file.close()
+        # Salva em arquivo temporário seguro
+        tmp_file = tempfile.NamedTemporaryFile(suffix='.png', prefix='grafico_', delete=False)
+        caminho_arquivo = tmp_file.name
+        tmp_file.close()
 
-    plt.savefig(caminho_arquivo, dpi=150, bbox_inches='tight', facecolor=fig.get_facecolor())
-    plt.close()
-
-    return caminho_arquivo
+        plt.savefig(caminho_arquivo, dpi=150, bbox_inches='tight', facecolor=fig.get_facecolor())
+        return caminho_arquivo
+    finally:
+        plt.close(fig)
